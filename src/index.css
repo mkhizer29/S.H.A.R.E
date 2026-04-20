@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+  }
+
+  body {
+    @apply bg-background text-neutral-900 font-sans tracking-tight antialiased selection:bg-primary-light selection:text-primary;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white max-md:backdrop-blur-md;
+    box-shadow: 0 4px 24px rgba(139, 120, 230, 0.05);
+  }
+  
+  .glass-dark {
+    @apply bg-neutral-900/80 backdrop-blur-xl border border-neutral-500/20;
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
+  }
+}
+
+@layer components {
+  /* Hide scrollbar for a cleaner feel but keep functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Targeted transitions for interactive elements — avoiding wildcard which breaks framer-motion and causes glitchy rendering */
+a, button, input, textarea, select,
+[class*="hover:"],
+[class*="transition"] {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-duration: 200ms;
+}
+
+/* Exempt some elements from the wildcard transition to avoid sluggishness */
+input, textarea, select {
+  transition-property: border-color, background-color, box-shadow;
+}
+
+/* Ensure Framer Motion handles its own transitions without conflict */
+[data-framer-component] * {
+  transition: none !important;
+}
