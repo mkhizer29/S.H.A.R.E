@@ -14,6 +14,7 @@ const INITIAL_CONVERSATIONS = [
     lastMessage: 'How have you been sleeping this week?',
     lastTime: '10:42 AM',
     unread: 2,
+    isDemo: true,
     messages: [
       { id: 'm1', from: 'pro', text: 'Hello! How are you feeling today?', time: '10:30 AM', read: true },
       { id: 'm2', from: 'me', text: 'A bit anxious, but better than yesterday.', time: '10:33 AM', read: true },
@@ -30,6 +31,7 @@ const INITIAL_CONVERSATIONS = [
     lastMessage: 'Your next session is on Thursday.',
     lastTime: 'Yesterday',
     unread: 0,
+    isDemo: true,
     messages: [
       { id: 'm1', from: 'pro', text: 'Great session today. Remember to journal daily.', time: 'Yesterday 4:00 PM', read: true },
       { id: 'm2', from: 'me', text: 'I will, thank you.', time: 'Yesterday 4:05 PM', read: true },
@@ -44,6 +46,7 @@ const INITIAL_CONVERSATIONS = [
     lastMessage: 'Take your time. I\'m here whenever you\'re ready.',
     lastTime: 'Mon',
     unread: 1,
+    isDemo: true,
     messages: [
       { id: 'm1', from: 'me', text: 'I\'m struggling to talk about this.', time: 'Mon 2:10 PM', read: true },
       { id: 'm2', from: 'pro', text: 'Take your time. I\'m here whenever you\'re ready.', time: 'Mon 2:15 PM', read: false },
@@ -69,19 +72,16 @@ export const useChatStore = create((set, get) => ({
     const { activeConvId } = get()
 
     // 1. Encrypt message locally before it "leaves" the device
-    console.log(`[E2E] Original outgoing message: "${text}"`);
     const encryptedPayload = encryptMessage(text, PRO_KEYS.publicKey, MY_KEYS.secretKey);
-    console.log(`[E2E] Ciphertext stored in database: ${encryptedPayload.ciphertext.substring(0, 30)}...`);
 
     // 2. Decode it back immediately to render in our mock UI (simulating the client reading its own message)
-    // Normally, the client saves its own sent messages in local DB, or decrypts incoming from remote.
     const decryptedTextForUI = decryptMessage(encryptedPayload.ciphertext, encryptedPayload.nonce, MY_KEYS.publicKey, PRO_KEYS.secretKey);
 
     const newMsg = {
       id: `m-${Date.now()}`,
       from: 'me',
-      text: decryptedTextForUI, // Proving it survived encrypt->decrypt cycle
-      _cipherBlob: encryptedPayload.ciphertext, // Hide this in state to prove it's encrypted
+      text: decryptedTextForUI, 
+      _cipherBlob: encryptedPayload.ciphertext, 
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       read: true,
     }
@@ -104,10 +104,7 @@ export const useChatStore = create((set, get) => ({
       ]
       const rawReplyText = replies[Math.floor(Math.random() * replies.length)];
       
-      // Pro encrypts their reply
       const proEncrypted = encryptMessage(rawReplyText, MY_KEYS.publicKey, PRO_KEYS.secretKey);
-      
-      // We receive ciphertext and decrypt it locally to render
       const patientDecrypted = decryptMessage(proEncrypted.ciphertext, proEncrypted.nonce, PRO_KEYS.publicKey, MY_KEYS.secretKey);
 
       const reply = {

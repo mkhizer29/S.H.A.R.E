@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 export default function FeatureShowcase() {
   const features = [
     {
-      title: "Anonymous by design.",
-      desc: "Connect under a pseudonym. Your real identity is never exposed, giving you the complete freedom to be honest about how you feel.",
+      title: "Privacy-focused pseudonyms.",
+      desc: "Connect under a pseudonym to maintain your social privacy. We prioritize your comfort and control over your personal identity.",
       image: "/images/anon.png"
     },
     {

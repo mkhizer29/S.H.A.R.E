@@ -32,9 +32,15 @@ export default function LiveSession() {
       
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 h-20 px-8 flex items-center justify-between z-10 border-b border-neutral-100/50 bg-white/30 backdrop-blur-md">
-        <div className="flex items-center gap-3 bg-white/50 px-4 py-2 rounded-2xl border border-neutral-200 backdrop-blur-lg">
-          <Lock size={14} className="text-primary" />
-          <span className="text-[13px] font-bold tracking-wide uppercase text-neutral-600">Secure Voice Session</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 bg-white/50 px-4 py-2 rounded-2xl border border-neutral-200 backdrop-blur-lg">
+            <Lock size={14} className="text-primary" />
+            <span className="text-[13px] font-bold tracking-wide uppercase text-neutral-600">Secure Voice Session</span>
+          </div>
+          <span className="bg-amber-100 text-amber-700 text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider border border-amber-200 flex items-center gap-1.5 shadow-sm">
+            <Zap size={10} fill="currentColor" />
+            Demo Mode
+          </span>
         </div>
         <div className="font-mono text-xl font-bold tracking-widest text-neutral-900 bg-white/50 px-4 py-2 rounded-2xl border border-neutral-200 backdrop-blur-lg">
           {isConnected ? duration : 'Connecting...'}
@@ -124,7 +130,7 @@ export default function LiveSession() {
         </motion.div>
         
         <p className="mt-8 text-[13px] font-medium text-neutral-400 text-center max-w-md mx-auto">
-          You are completely anonymous. This session is never recorded and is end-to-end encrypted.
+          Your privacy is protected with pseudonym-based connections. This demo session is end-to-end encrypted.
         </p>
 
       </div>

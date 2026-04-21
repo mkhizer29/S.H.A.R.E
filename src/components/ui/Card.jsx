@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 
 export default function Card({ children, className = '', hover = true, onClick, glass = false }) {
-  const baseStyle = glass 
+  const baseStyle = glass
     ? 'bg-white/70 backdrop-blur-xl border border-white shadow-soft rounded-3xl'
     : 'bg-surface border border-neutral-200 shadow-soft rounded-3xl'
 

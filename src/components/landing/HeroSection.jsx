@@ -24,7 +24,7 @@ export default function HeroSection() {
             </span>
           </h1>
           <p className="text-lg md:text-[22px] text-text-muted mb-10 leading-relaxed font-medium">
-            Connect with verified professionals anonymously. Voice-first sessions, encrypted chats, and a space that feels like yours—no real name required.
+            Connect with verified professionals securely. Voice-first sessions, encrypted chats, and a space built for your privacy—no real name needed.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <button

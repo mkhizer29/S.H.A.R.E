@@ -24,6 +24,6 @@ export const useBookingStore = create((set) => ({
     }))
   },
 
-  getUpcoming: () => SESSIONS.filter((s) => s.status === 'upcoming'),
-  getPast: () => SESSIONS.filter((s) => s.status === 'completed' || s.status === 'cancelled'),
+  getUpcoming: () => get().sessions.filter((s) => s.status === 'upcoming'),
+  getPast: () => get().sessions.filter((s) => s.status === 'completed' || s.status === 'cancelled'),
 }))

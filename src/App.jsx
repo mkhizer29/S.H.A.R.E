@@ -49,11 +49,24 @@ const ProtectedRoute = ({ children, allowedRole }) => {
   }
 
   if (allowedRole && role !== allowedRole) {
-    // Redirect to their respective dashboard if they try to access wrong portal
-    if (role === 'patient') return <Navigate to="/patient" replace />;
-    if (role === 'professional') return <Navigate to="/pro" replace />;
-    if (role === 'admin') return <Navigate to="/admin" replace />;
-    return <Navigate to="/" replace />;
+    return (
+      <div className="min-h-screen bg-lilac-50 flex items-center justify-center p-6 text-center font-sans">
+        <div className="max-w-md w-full bg-white rounded-[2.5rem] p-10 shadow-soft border border-lilac-100">
+          <div className="w-16 h-16 bg-alert-light rounded-2xl flex items-center justify-center mx-auto mb-6 text-alert">
+            <Lock size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-neutral-900 mb-3 tracking-tight">Access Restricted</h2>
+          <p className="text-neutral-500 mb-8 leading-relaxed">
+            You're currently signed in as {role === 'professional' ? 'a professional' : role === 'admin' ? 'an admin' : 'a patient'}. 
+            This area is reserved for {allowedRole}s.
+          </p>
+          <div className="flex flex-col gap-3">
+             <Navigate to={role === 'patient' ? '/patient' : role === 'professional' ? '/pro' : '/admin'} replace />
+             <p className="text-xs text-neutral-400 animate-pulse">Redirecting to your workspace...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return children;
@@ -98,6 +111,7 @@ function App() {
           <Route path="clients" element={<Clients />} />
           <Route path="revenue" element={<Revenue />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="session/:id" element={<LiveSession />} />
         </Route>
 
         {/* Admin Portal */}

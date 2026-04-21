@@ -57,11 +57,10 @@ export default function MoodCheckIn() {
                   {MOODS.map((m) => (
                     <motion.button
                       key={m.score}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-[18px] transition-all border-2 border-transparent ${
-                        selected === m.score 
-                          ? 'bg-primary-light border-primary shadow-inner-soft -translate-y-2' 
+                      className={`flex flex-col items-center gap-2 p-3 rounded-[18px] transition-all border-2 border-transparent ${selected === m.score
+                          ? 'bg-primary-light border-primary shadow-inner-soft -translate-y-2'
                           : 'hover:bg-neutral-100 hover:-translate-y-1'
-                      }`}
+                        }`}
                       onClick={() => setSelected(m.score)}
                       whileHover={{ scale: selected === m.score ? 1 : 1.05 }}
                       whileTap={{ scale: 0.95 }}

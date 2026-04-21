@@ -40,7 +40,7 @@ export default function Directory() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-1">
         <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Find a Professional</h1>
-        <p className="text-neutral-500 text-[15px]">{PROFESSIONALS.length} verified professionals available to support you.</p>
+        <p className="text-neutral-500 text-[15px]">{PROFESSIONALS.filter(p => p.verified).length} verified specialists available to support you.</p>
       </motion.div>
 
       {/* Search + filter bar */}
@@ -172,13 +172,13 @@ export default function Directory() {
 
       {/* Results */}
       {filtered.length === 0 ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 bg-surface rounded-[40px] border-2 border-dashed border-neutral-200">
           <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-6">
             <Search size={32} className="text-primary" />
           </div>
           <p className="text-2xl font-bold text-neutral-900 tracking-tight mb-2">No professionals found</p>
-          <p className="text-[15px] text-neutral-500 mb-6">Try adjusting your filters to find what you're looking for.</p>
-          <Button onClick={clearFilters} variant="secondary">Clear all filters</Button>
+          <p className="text-[15px] text-neutral-500 mb-8 max-w-sm mx-auto">We couldn't find any specialists matching your current filters. Try adjusting your search or clearing filters.</p>
+          <Button onClick={clearFilters} variant="primary" className="shadow-float">Clear all filters</Button>
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>

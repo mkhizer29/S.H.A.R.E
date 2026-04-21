@@ -86,10 +86,16 @@ export default function Chat() {
       {activeConv ? (
         <div className="flex-1 flex flex-col min-w-0 bg-surface">
           {/* Chat header */}
-          <div className="px-6 py-4 border-b border-neutral-200 bg-surface flex items-center gap-4 flex-shrink-0">
+          <div className="px-6 py-4 border-b border-neutral-200 bg-surface flex items-center gap-4 flex-shrink-0 relative">
+            {/* Demo indicator banner */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-amber-200/50" />
+            
             <Avatar name={activeConv.proName} size="md" online={activeConvId === 'conv-1'} />
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-neutral-900 text-lg tracking-tight truncate">{activeConv.proName}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-neutral-900 text-lg tracking-tight truncate">{activeConv.proName}</p>
+                <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Demo Mode</span>
+              </div>
               <p className="text-[13.5px] font-medium text-neutral-500 truncate">{activeConv.proSpecialty}</p>
             </div>
             
@@ -175,7 +181,7 @@ export default function Chat() {
             </div>
             <p className="text-[12px] font-medium text-neutral-400 mt-3 flex items-center justify-center gap-1.5 text-center">
               <Lock size={10} />
-              Messages are encrypted end-to-end. Your therapist cannot share them.
+              Messages are encrypted end-to-end. Your specialist cannot share them.
             </p>
           </div>
         </div>

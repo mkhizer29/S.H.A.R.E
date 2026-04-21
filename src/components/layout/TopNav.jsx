@@ -10,7 +10,7 @@ export default function TopNav() {
   const handleQuickExit = () => {
     // Implement an instant redirect to a safe page like Google, 
     // replacing the current history state to prevent back navigation.
-    window.location.replace('https://www.google.com'); 
+    window.location.replace('https://www.google.com');
   };
 
   return (
@@ -33,16 +33,16 @@ export default function TopNav() {
         {/* Right Actions */}
         <div className="flex items-center gap-3">
           {/* Quick Exit Button - Prioritized for Patient Safety */}
-          <Button 
-            variant="dangerGhost" 
-            size="sm" 
+          <Button
+            variant="dangerGhost"
+            size="sm"
             onClick={handleQuickExit}
             className="font-bold tracking-wide mr-2 hidden sm:flex !bg-alert/10 hover:!bg-alert/20 !text-alert border border-alert/20"
             title="Instantly exit the platform"
           >
             Quick Exit
           </Button>
-          
+
           <button className="w-10 h-10 flex items-center justify-center text-neutral-500 hover:text-primary transition-colors hover:bg-primary-light rounded-full relative">
             <Bell size={20} />
             <span className="absolute top-2 right-2.5 w-2 h-2 bg-alert rounded-full border-2 border-background" />
@@ -57,7 +57,7 @@ export default function TopNav() {
             </span>
           </div>
 
-          <button 
+          <button
             onClick={logout}
             className="w-10 h-10 flex hidden sm:flex items-center justify-center text-neutral-400 hover:text-alert transition-colors hover:bg-alert-light rounded-full ml-1"
             title="Log Out"

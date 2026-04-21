@@ -60,7 +60,7 @@ export default function Settings() {
         <Card hover={false} className="divide-y divide-border-subtle">
           {[
             { key: 'sessions', label: 'Session reminders', desc: '24hr before your next booking' },
-            { key: 'messages', label: 'New messages', desc: 'When your therapist replies' },
+            { key: 'messages', label: 'New messages', desc: 'When your specialist replies' },
             { key: 'moodReminders', label: 'Mood check-in reminders', desc: 'Daily at 9:00 AM' },
             { key: 'weeklyReport', label: 'Weekly wellbeing report', desc: 'Summary of your progress each Sunday' },
           ].map((item) => (
@@ -87,25 +87,31 @@ export default function Settings() {
           <h2 className="font-display text-lg text-text-primary">Your Data</h2>
         </div>
         <Card hover={false} className="divide-y divide-border-subtle">
-          <button className="w-full flex items-center justify-between p-4 hover:bg-sage-light/40 transition-all">
+          <button className="w-full flex items-center justify-between p-4 hover:bg-sage-light/40 transition-all group">
             <div className="flex items-center gap-3">
-              <download size={15} className="text-text-secondary" />
+              <Download size={15} className="text-text-secondary" />
               <div className="text-left">
-                <p className="text-sm font-medium text-text-primary">Export My Data</p>
+                <p className="text-sm font-medium text-text-primary flex items-center gap-2">
+                  Export My Data
+                  <span className="text-[10px] bg-neutral-100 text-neutral-400 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Coming Soon</span>
+                </p>
                 <p className="text-xs text-text-muted">Download encrypted archive of your sessions and messages</p>
               </div>
             </div>
-            <ChevronRight size={15} className="text-text-muted" />
+            <ChevronRight size={15} className="text-text-muted group-hover:translate-x-1 transition-transform" />
           </button>
-          <button className="w-full flex items-center justify-between p-4 hover:bg-sage-light/40 transition-all">
+          <button className="w-full flex items-center justify-between p-4 hover:bg-sage-light/40 transition-all group">
             <div className="flex items-center gap-3">
               <Eye size={15} className="text-text-secondary" />
               <div className="text-left">
-                <p className="text-sm font-medium text-text-primary">Delete Chat History</p>
+                <p className="text-sm font-medium text-text-primary flex items-center gap-2">
+                  Delete Chat History
+                  <span className="text-[10px] bg-neutral-100 text-neutral-400 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Coming Soon</span>
+                </p>
                 <p className="text-xs text-text-muted">Permanently remove all messages from our servers</p>
               </div>
             </div>
-            <ChevronRight size={15} className="text-text-muted" />
+            <ChevronRight size={15} className="text-text-muted group-hover:translate-x-1 transition-transform" />
           </button>
           <button
             onClick={() => setShowDeleteModal(true)}

@@ -5,7 +5,7 @@ export function AnnouncementBar() {
   return (
     <div className="w-full bg-surface-warm border-b border-lilac-100 py-3 px-4 text-center text-[13px] md:text-sm font-medium text-text-muted flex justify-center items-center gap-2">
       <span className="w-2 h-2 bg-sage-500 rounded-full animate-pulse-soft"></span>
-      No credit card required. No real name needed. Delete everything anytime.
+      Safe pseudonymous connections. Encrypted sessions. Delete anytime.
     </div>
   );
 }
@@ -13,7 +13,7 @@ export function AnnouncementBar() {
 export function TrustStrip() {
   return (
     <div className="max-w-6xl mx-auto grid md:grid-cols-4 gap-8">
-      {['Anonymous by Design', 'Verified Professionals', 'Encrypted Sessions', 'Voice-First Approach'].map((text, i) => (
+      {['Privacy First', 'Verified Professionals', 'Encrypted Sessions', 'Voice-First Approach'].map((text, i) => (
         <div key={i} className="bg-white/80 backdrop-blur-md rounded-[32px] p-8 text-center border border-white shadow-soft flex flex-col items-center justify-center gap-4 transition-transform hover:-translate-y-1 duration-500">
           <svg className="w-19 h-20 text-sage-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -27,9 +27,9 @@ export function TrustStrip() {
 
 export function HowItWorks() {
   const steps = [
-    { step: '01', title: 'Create an Alias', desc: 'Sign up with just a username — no email, no phone, no real name required.' },
-    { step: '02', title: 'Browse & Match', desc: 'Filter professionals by specialty, language, and availability. Read realistic reviews.' },
-    { step: '03', title: 'Talk Your Way', desc: 'Chat through encrypted text, or start a live voice-first session when ready.' },
+    { step: '01', title: 'Create an Alias', desc: 'Sign up with a username — keep your social identity private with pseudonymous accounts.' },
+    { step: '02', title: 'Browse & Match', desc: 'Filter professionals by specialty, language, and availability. Read verified reviews.' },
+    { step: '03', title: 'Talk Your Way', desc: 'Securely chat or start a live voice-first session when you are ready.' },
   ];
 
   return (
@@ -65,7 +65,7 @@ export function Testimonials() {
   const reviews = [
     { alias: 'BlueSky42', text: 'For the first time, I could talk about my anxiety without the fear of being judged by someone who knows me. This felt genuinely safe.' },
     { alias: 'GoldenLeaf', text: 'The voice-first approach removed my biggest barrier. I had tried therapy before but always hated being on camera. Here, I actually opened up.' },
-    { alias: 'QuietMoon', text: 'My therapist responded within the hour. The encrypted chat made me feel completely protected. I’ve recommended it to three friends.' },
+    { alias: 'QuietMoon', text: 'My specialist responded within the hour. The encrypted chat made me feel completely protected. I’ve recommended it to three friends.' },
   ];
 
   return (

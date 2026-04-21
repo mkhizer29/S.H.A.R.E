@@ -7,7 +7,7 @@ import Input from '../../components/ui/Input'
 
 const ROLE_OPTIONS = [
   { role: 'patient', label: 'I need support', desc: 'Browse professionals, book sessions, chat anonymously', icon: User, color: 'border-lilac-200 bg-white', activeColor: 'border-violet-600 bg-violet-50' },
-  { role: 'professional', label: 'I\'m a professional', desc: 'Join as a therapist, counsellor, or psychiatrist', icon: Briefcase, color: 'border-lilac-200 bg-white', activeColor: 'border-sage-500 bg-sage-50' },
+  { role: 'professional', label: 'I\'m a professional', desc: 'Join as a specialist, counsellor, or psychiatrist', icon: Briefcase, color: 'border-lilac-200 bg-white', activeColor: 'border-sage-500 bg-sage-50' },
 ]
 
 export default function SignUp() {

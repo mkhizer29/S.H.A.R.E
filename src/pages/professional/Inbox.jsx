@@ -24,7 +24,7 @@ const Inbox = () => {
   ];
 
   const startSession = () => {
-    navigate(`/patient/session/BlueJay`);
+    navigate(`/pro/session/BlueJay`);
   };
 
   return (

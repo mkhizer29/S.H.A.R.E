@@ -11,12 +11,13 @@ function CheckoutForm({ pro, onClose }) {
   const navigate = useNavigate()
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [method, setMethod] = useState('card') // 'card' or 'bank'
 
   const handleSubmit = (e) => {
     e.preventDefault()
     setProcessing(true)
     
-    // Simulate API call to Stripe and Firestore backend
+    // Simulate API call
     setTimeout(() => {
       setProcessing(false)
       setSuccess(true)
@@ -33,55 +34,92 @@ function CheckoutForm({ pro, onClose }) {
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="w-20 h-20 bg-sage-50 rounded-full flex items-center justify-center mb-6"
+          className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6"
         >
-          <CheckCircle size={40} className="text-sage-500" />
+          <CheckCircle size={40} className="text-green-500" />
         </motion.div>
-        <h3 className="text-2xl font-bold text-text-main mb-2">Payment Secured</h3>
-        <p className="text-text-muted">You are now securely connected to {pro?.name || 'your professional'}. An encrypted channel has been established.</p>
+        <h3 className="text-2xl font-bold text-neutral-900 mb-2">Connection Secured</h3>
+        <p className="text-neutral-500">Your session with {pro?.name} is confirmed. A secure, encrypted channel has been established for your privacy.</p>
       </div>
     )
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="bg-lilac-50 p-6 rounded-2xl border border-lilac-100 flex items-center gap-4">
-        <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center flex-shrink-0">
-          <CreditCard className="text-violet-600" />
+    <div className="space-y-6">
+      {/* Price Display */}
+      <div className="bg-primary-light/40 p-6 rounded-[24px] border border-primary-light flex items-center gap-4">
+        <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center flex-shrink-0 font-bold text-primary">
+          {pro?.currency || 'Rs.'}
         </div>
         <div>
-          <p className="text-text-muted text-[13px] font-bold uppercase tracking-wider mb-0.5">Total Amount</p>
-          <p className="text-2xl font-bold text-text-main">$120.00 <span className="text-[15px] font-medium text-text-muted">/ session</span></p>
+          <p className="text-neutral-500 text-[13px] font-bold uppercase tracking-wider mb-0.5">Total Amount</p>
+          <p className="text-2xl font-bold text-neutral-900">{pro?.currency || 'Rs.'} {pro?.pricePerSession?.toLocaleString() || '3,000'} <span className="text-[15px] font-medium text-neutral-400">/ session</span></p>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <Input label="Name on Card" placeholder="Alias or Real Name" required />
-        <Input label="Card Number" placeholder="•••• •••• •••• ••••" required type="text" />
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="Expiry (MM/YY)" placeholder="12/25" required />
-          <Input label="CVC" placeholder="•••" required type="password" />
-        </div>
+      {/* Method Selection */}
+      <div className="flex p-1 bg-surface-tinted rounded-2xl">
+        <button
+          onClick={() => setMethod('card')}
+          className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all ${method === 'card' ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}
+        >
+          Credit/Debit Card
+        </button>
+        <button
+          onClick={() => setMethod('bank')}
+          className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all ${method === 'bank' ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}
+        >
+          Online Transfer
+        </button>
       </div>
 
-      <div className="flex items-center gap-2 text-[12px] font-medium text-text-muted bg-[#F8F7FA] p-4 rounded-xl">
-        <Shield size={14} className="text-violet-600 flex-shrink-0" />
-        Payments are processed securely by Stripe. Your billing details are never stored on our servers to maintain absolute anonymity.
-      </div>
-
-      <motion.button
-        type="submit"
-        disabled={processing}
-        whileTap={{ scale: 0.98 }}
-        className="w-full bg-violet-600 text-white py-4 rounded-2xl font-bold hover:bg-violet-700 shadow-soft transition-colors flex items-center justify-center"
-      >
-        {processing ? (
-          <span className="flex items-center gap-2">Processing Payment...</span>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {method === 'card' ? (
+          <div className="space-y-4">
+            <Input label="Name on Card" placeholder="Optional for Anonymity" required />
+            <Input label="Card Number" placeholder="•••• •••• •••• ••••" required type="text" />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Expiry (MM/YY)" placeholder="12/25" required />
+              <Input label="CVC" placeholder="•••" required type="password" />
+            </div>
+          </div>
         ) : (
-          `Pay $120.00 Securely`
+          <div className="space-y-4 bg-surface-tinted p-6 rounded-[24px] border border-neutral-200">
+            <h4 className="text-[14px] font-bold text-neutral-900 uppercase tracking-wide mb-2">Our Bank Details</h4>
+            <div className="space-y-3">
+              <div>
+                <p className="text-[11px] font-bold text-neutral-400 uppercase">Bank Name</p>
+                <p className="font-semibold text-neutral-800">Habib Bank Limited (HBL)</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-neutral-400 uppercase">Account Title</p>
+                <p className="font-semibold text-neutral-800">SHARE Mental Health Pvt.</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-neutral-400 uppercase">Account Number / IBAN</p>
+                <p className="font-mono font-bold text-primary select-all cursor-pointer" title="Click to copy">PK24 HABB 0001 2345 6789 0123</p>
+              </div>
+            </div>
+            <p className="text-[12px] font-medium text-neutral-500 pt-2 italic">
+              Please upload a screenshot of the receipt in the chat once connected.
+            </p>
+          </div>
         )}
-      </motion.button>
-    </form>
+
+        <div className="flex items-center gap-2 text-[12px] font-medium text-neutral-500 bg-surface-tinted/50 p-4 rounded-xl border border-neutral-100">
+          <Shield size={14} className="text-primary flex-shrink-0" />
+          Secure & Encrypted Processing. Your billing details are processed through industry-standard gateways.
+        </div>
+
+        <Button
+          type="submit"
+          loading={processing}
+          className="w-full py-4 !rounded-2xl font-bold transition-all shadow-float"
+        >
+          Confirm Payment & Connect
+        </Button>
+      </form>
+    </div>
   )
 }
 
@@ -103,21 +141,25 @@ export default function CheckoutModal({ isOpen, onClose, pro }) {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-float p-8 z-10"
+          className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-float z-10 overflow-hidden max-h-[90vh] flex flex-col"
         >
+          {/* Close button - Fixed to top right */}
           <button
             onClick={onClose}
-            className="absolute top-6 right-6 w-10 h-10 bg-surface-warm rounded-full flex items-center justify-center text-text-muted hover:text-text-main transition-colors"
+            className="absolute top-6 right-6 w-10 h-10 bg-surface-warm/80 backdrop-blur-sm rounded-full flex items-center justify-center text-text-muted hover:text-text-main transition-colors z-20"
           >
             <X size={20} />
           </button>
-
-          <h2 className="text-[28px] font-bold text-text-main tracking-tight mb-2">Book Session</h2>
-          <p className="text-text-muted font-medium mb-8">Secure your appointment with {pro?.name}.</p>
-
-          <Elements stripe={stripePromise}>
-            <CheckoutForm pro={pro} onClose={onClose} />
-          </Elements>
+          
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+            <h2 className="text-[28px] font-bold text-text-main tracking-tight mb-2 pr-10">Book Session</h2>
+            <p className="text-text-muted font-medium mb-8">Secure your appointment with {pro?.name}.</p>
+  
+            <Elements stripe={stripePromise}>
+              <CheckoutForm pro={pro} onClose={onClose} />
+            </Elements>
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 @layer base {
+
   *,
   *::before,
   *::after {
@@ -13,7 +14,9 @@
     box-sizing: border-box;
   }
 
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
     width: 100%;
   }
@@ -28,21 +31,23 @@
     @apply bg-white/70 backdrop-blur-xl border border-white max-md:backdrop-blur-md;
     box-shadow: 0 4px 24px rgba(139, 120, 230, 0.05);
   }
-  
+
   .glass-dark {
     @apply bg-neutral-900/80 backdrop-blur-xl border border-neutral-500/20;
   }
-  
+
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
   }
 }
 
 @layer components {
+
   /* Hide scrollbar for a cleaner feel but keep functionality */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -50,7 +55,11 @@
 }
 
 /* Targeted transitions for interactive elements — avoiding wildcard which breaks framer-motion and causes glitchy rendering */
-a, button, input, textarea, select,
+a,
+button,
+input,
+textarea,
+select,
 [class*="hover:"],
 [class*="transition"] {
   transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
@@ -59,11 +68,30 @@ a, button, input, textarea, select,
 }
 
 /* Exempt some elements from the wildcard transition to avoid sluggishness */
-input, textarea, select {
+input,
+textarea,
+select {
   transition-property: border-color, background-color, box-shadow;
 }
 
 /* Ensure Framer Motion handles its own transitions without conflict */
 [data-framer-component] * {
   transition: none !important;
+}
+
+/* Custom Scrollbar for a premium, subtle look */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-neutral-200 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-neutral-300;
 }
