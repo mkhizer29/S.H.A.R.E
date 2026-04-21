@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, Percent, Download, Activity, RefreshCw } from 'lucide-react';
+import { Banknote, Percent, Download, Activity, RefreshCw } from 'lucide-react';
 
 const RevenueAdmin = () => {
   return (
@@ -18,14 +18,14 @@ const RevenueAdmin = () => {
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         <div className="bg-warm-white-pure p-6 rounded-2xl border border-sage-light shadow-sm">
            <h3 className="text-sm font-medium text-text-secondary mb-1">Platform Revenue (MTD)</h3>
-           <p className="text-3xl font-serif text-text-primary mb-2">Rs. 3.4M</p>
+           <p className="text-3xl font-serif text-text-primary mb-2">PKR 3.4M</p>
            <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 px-2 py-1 rounded inline-flex">
               <Activity className="w-3 h-3" /> +15.2% vs last month
            </div>
         </div>
         <div className="bg-warm-white-pure p-6 rounded-2xl border border-sage-light shadow-sm">
            <h3 className="text-sm font-medium text-text-secondary mb-1">Pending Payouts</h3>
-           <p className="text-3xl font-serif text-text-primary mb-2">Rs. 920,400</p>
+           <p className="text-3xl font-serif text-text-primary mb-2">PKR 920,400</p>
            <div className="text-xs text-text-secondary mt-2">
               Next batch processing: Tomorrow
            </div>
@@ -61,9 +61,9 @@ const RevenueAdmin = () => {
             </thead>
             <tbody className="divide-y divide-sage-light text-sm">
                {[
-                 { pro: 'Dr. Sarah Jenkins', amt: 'Rs. 4,500', method: 'Stripe Connect', status: 'Ready' },
-                 { pro: 'Michael Chen, MD', amt: 'Rs. 3,800', method: 'Bank Transfer', status: 'Processing' },
-                 { pro: 'Elena Rodriguez, LCSW', amt: 'Rs. 3,200', method: 'Stripe Connect', status: 'Ready' },
+                 { pro: 'Dr. Sarah Jenkins', amt: 'PKR 4,500', method: 'Stripe Connect', status: 'Ready' },
+                 { pro: 'Michael Chen, MD', amt: 'PKR 3,800', method: 'Bank Transfer', status: 'Processing' },
+                 { pro: 'Elena Rodriguez, LCSW', amt: 'PKR 3,200', method: 'Stripe Connect', status: 'Ready' },
                ].map((item, idx) => (
                  <tr key={idx} className="hover:bg-warm-white/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-text-primary">{item.pro}</td>

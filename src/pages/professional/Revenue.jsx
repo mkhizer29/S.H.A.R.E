@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DollarSign, TrendingUp, Download, CheckCircle, Clock } from 'lucide-react';
+import { Banknote, TrendingUp, Download, CheckCircle, Clock } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 
@@ -7,10 +7,10 @@ const Revenue = () => {
   const [activeTab, setActiveTab] = useState('overview');
 
   const history = [
-    { id: '1', date: 'Oct 15, 2023', description: 'Session with BlueJay', amount: 'Rs. 4,500', status: 'Completed', fee: 'Rs. 675', net: 'Rs. 3,825' },
-    { id: '2', date: 'Oct 14, 2023', description: 'Session with RiverStone', amount: 'Rs. 4,500', status: 'Completed', fee: 'Rs. 675', net: 'Rs. 3,825' },
-    { id: '3', date: 'Oct 12, 2023', description: 'Payout to Bank ****4829', amount: '-Rs. 12,500', status: 'Processed', fee: 'Rs. 0', net: '-Rs. 12,500' },
-    { id: '4', date: 'Oct 10, 2023', description: 'Session with ForestWalker', amount: 'Rs. 4,500', status: 'Completed', fee: 'Rs. 675', net: 'Rs. 3,825' },
+    { id: '1', date: 'Oct 15, 2023', description: 'Session with BlueJay', amount: 'PKR 4,500', status: 'Completed', fee: 'PKR 675', net: 'PKR 3,825' },
+    { id: '2', date: 'Oct 14, 2023', description: 'Session with RiverStone', amount: 'PKR 4,500', status: 'Completed', fee: 'PKR 675', net: 'PKR 3,825' },
+    { id: '3', date: 'Oct 12, 2023', description: 'Payout to Bank ****4829', amount: '-PKR 12,500', status: 'Processed', fee: 'PKR 0', net: '-PKR 12,500' },
+    { id: '4', date: 'Oct 10, 2023', description: 'Session with ForestWalker', amount: 'PKR 4,500', status: 'Completed', fee: 'PKR 675', net: 'PKR 3,825' },
   ];
 
   return (
@@ -30,11 +30,11 @@ const Revenue = () => {
         <Card hover={true} className="p-8 h-full">
            <div className="flex items-center gap-3 mb-4">
              <div className="p-3 bg-primary-light rounded-2xl shadow-inner-soft">
-               <DollarSign className="w-5 h-5 text-primary" />
+               <Banknote className="w-5 h-5 text-primary" />
              </div>
              <h3 className="text-[13px] font-bold text-neutral-400 tracking-wide uppercase">Expected Next Payout</h3>
            </div>
-           <p className="text-4xl font-bold text-neutral-900 tracking-tight mt-2">Rs. 18,250</p>
+           <p className="text-4xl font-bold text-neutral-900 tracking-tight mt-2">PKR 18,250</p>
            <p className="text-[13px] font-semibold text-neutral-500 mt-3">Processing on Oct 20</p>
         </Card>
         
@@ -45,7 +45,7 @@ const Revenue = () => {
              </div>
              <h3 className="text-[13px] font-bold text-neutral-400 tracking-wide uppercase">Earned this Month (Net)</h3>
            </div>
-           <p className="text-4xl font-bold text-neutral-900 tracking-tight mt-2">Rs. 115,400</p>
+           <p className="text-4xl font-bold text-neutral-900 tracking-tight mt-2">PKR 115,400</p>
            <p className="text-[13px] font-bold text-[#6DA398] mt-3">+12% from last month</p>
         </Card>
 
@@ -53,11 +53,11 @@ const Revenue = () => {
            <div>
              <div className="flex items-center gap-3 mb-4">
                <div className="p-3 bg-accent-light/50 rounded-2xl shadow-inner-soft">
-                 <DollarSign className="w-5 h-5 text-accent-hover" />
+                 <Banknote className="w-5 h-5 text-accent-hover" />
                </div>
                <h3 className="text-[13px] font-bold text-neutral-400 tracking-wide uppercase">Total Earned (YTD)</h3>
              </div>
-             <p className="text-4xl font-bold text-neutral-900 tracking-tight mt-2">Rs. 942,500</p>
+             <p className="text-4xl font-bold text-neutral-900 tracking-tight mt-2">PKR 942,500</p>
            </div>
            <div className="mt-4 pt-4 border-t border-neutral-100 flex justify-between items-center">
               <span className="text-[13px] font-medium text-neutral-500">Standard Fee: 15%</span>

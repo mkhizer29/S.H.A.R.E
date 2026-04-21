@@ -50,10 +50,13 @@ export const useAuthStore = create((set) => ({
     } catch (error) {
       console.warn("Firebase Auth Error (Missing keys?). Falling back to Mock Demo Data:", error.message);
       // Fallback due to missing env variables or demo run
-      setTimeout(() => {
-        const user = DEMO_USERS[role] || DEMO_USERS['patient']
-        set({ user, role, isAuthenticated: true, isLoading: false })
-      }, 800)
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const user = DEMO_USERS[role] || DEMO_USERS['patient']
+          set({ user, role, isAuthenticated: true, isLoading: false })
+          resolve(user)
+        }, 800)
+      })
     }
   },
 
@@ -82,10 +85,13 @@ export const useAuthStore = create((set) => ({
       set({ user: { uid, email, alias, role }, role, isAuthenticated: true, isLoading: false })
     } catch (error) {
       console.warn("Firebase Registration Error (Missing keys?). Falling back to Mock Demo Data:", error.message);
-      setTimeout(() => {
-        const user = DEMO_USERS[role] || DEMO_USERS['patient']
-        set({ user, role, isAuthenticated: true, isLoading: false })
-      }, 800)
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const user = DEMO_USERS[role] || DEMO_USERS['patient']
+          set({ user, role, isAuthenticated: true, isLoading: false })
+          resolve(user)
+        }, 800)
+      })
     }
   },
 

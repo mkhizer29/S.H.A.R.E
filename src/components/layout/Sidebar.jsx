@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Shield, Home, Users, MessageSquare, Calendar, BarChart2,
-  Settings, LogOut, Star, DollarSign, AlertTriangle, CheckSquare,
+  Settings, LogOut, Star, Banknote, AlertTriangle, CheckSquare,
   Sliders, UserCheck, User
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
@@ -21,7 +21,7 @@ const NAV_ITEMS = {
     { to: '/pro/inbox', icon: MessageSquare, label: 'Inbox' },
     { to: '/pro/calendar', icon: Calendar, label: 'Calendar' },
     { to: '/pro/clients', icon: Users, label: 'Clients' },
-    { to: '/pro/revenue', icon: DollarSign, label: 'Revenue' },
+    { to: '/pro/revenue', icon: Banknote, label: 'Revenue' },
     { to: '/pro/profile', icon: User, label: 'Profile' },
   ],
   admin: [
@@ -29,7 +29,7 @@ const NAV_ITEMS = {
     { to: '/admin/verification', icon: CheckSquare, label: 'Verification' },
     { to: '/admin/analytics', icon: BarChart2, label: 'Analytics' },
     { to: '/admin/crisis', icon: AlertTriangle, label: 'Crisis Monitor' },
-    { to: '/admin/revenue', icon: DollarSign, label: 'Revenue' },
+    { to: '/admin/revenue', icon: Banknote, label: 'Revenue' },
     { to: '/admin/moderation', icon: UserCheck, label: 'Moderation' },
     { to: '/admin/config', icon: Sliders, label: 'Configuration' },
   ],

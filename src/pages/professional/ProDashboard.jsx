@@ -1,26 +1,28 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Users, Calendar as CalendarIcon, DollarSign, MessageSquare, CheckCircle, TrendingUp, Phone } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Banknote, MessageSquare, CheckCircle, TrendingUp, Phone, Clock } from 'lucide-react';
 import useAuthStore from '../../stores/authStore';
+import { useBookingStore } from '../../stores/bookingStore';
 import Card from '../../components/ui/Card';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import JoinSessionButton from '../../components/JoinSessionButton';
 
 const ProDashboard = () => {
   const { user } = useAuthStore();
+  const { sessions } = useBookingStore();
 
   const stats = [
     { label: 'Active Clients', value: '12', icon: Users, trend: '+2 this month' },
     { label: 'Sessions This Week', value: '18', icon: CalendarIcon, trend: '4 today' },
-    { label: 'Earnings MTD', value: '$2,450', icon: DollarSign, trend: '+15% vs last month' },
+    { label: 'Earnings MTD', value: 'PKR 2,450', icon: Banknote, trend: '+15% vs last month' },
   ];
 
-  const upcomingSessions = [
-    { id: 1, client: 'BlueJay', time: '10:00 AM', type: 'Voice Session' },
-    { id: 2, client: 'ForestWalker', time: '1:00 PM', type: 'Voice Session' },
-    { id: 3, client: 'OceanBreeze', time: '3:30 PM', type: 'Text Chat' },
-  ];
+  const upcomingSessions = sessions
+    .filter(s => s.status === 'upcoming')
+    .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))
+    .slice(0, 3);
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
@@ -80,10 +82,19 @@ const ProDashboard = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <p className="font-bold text-[14px] text-neutral-900">{session.time}</p>
-                    <Button variant="primary" size="sm" icon={<Phone size={14} />} className="font-semibold shadow-sm">
-                      Join
-                    </Button>
+                    <div className="flex items-center gap-2 text-[14px] font-medium text-neutral-500">
+                      <Clock size={16} className="text-primary" />
+                      <span>
+                        {new Date(session.startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {' '}
+                        {new Date(session.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <JoinSessionButton 
+                      startsAt={session.startsAt} 
+                      sessionId={session.id} 
+                      role="professional" 
+                      size="sm"
+                    />
                   </div>
                 </div>
               ))}

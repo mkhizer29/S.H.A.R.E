@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge'
 import Avatar from '../../components/ui/Avatar'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
+import JoinSessionButton from '../../components/JoinSessionButton'
 
 const STATUS_CONFIG = {
   upcoming: { badge: 'teal', label: 'Upcoming', icon: Clock },
@@ -84,11 +85,15 @@ export default function Bookings() {
                 <div className="grid grid-cols-3 gap-4 py-3 border-y border-border-subtle mb-4">
                   <div>
                     <p className="text-xs text-text-muted mb-0.5">Date</p>
-                    <p className="text-sm font-medium text-text-primary">{s.date}</p>
+                    <p className="text-sm font-medium text-text-primary">
+                      {new Date(s.startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-text-muted mb-0.5">Time</p>
-                    <p className="text-sm font-medium text-text-primary">{s.time}</p>
+                    <p className="text-sm font-medium text-text-primary">
+                      {new Date(s.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-text-muted mb-0.5">Duration</p>
@@ -111,7 +116,12 @@ export default function Bookings() {
 
                 {s.status === 'upcoming' && (
                   <div className="flex gap-3">
-                    <Button variant="primary" size="sm">Join Session</Button>
+                    <JoinSessionButton 
+                      startsAt={s.startsAt} 
+                      sessionId={s.id} 
+                      role="patient" 
+                      size="sm" 
+                    />
                     <Button variant="ghost" size="sm" onClick={() => setCancelId(s.id)}>Cancel</Button>
                   </div>
                 )}

@@ -49,11 +49,11 @@ function CheckoutForm({ pro, onClose }) {
       {/* Price Display */}
       <div className="bg-primary-light/40 p-6 rounded-[24px] border border-primary-light flex items-center gap-4">
         <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center flex-shrink-0 font-bold text-primary">
-          {pro?.currency || 'Rs.'}
+          {pro?.currency || 'PKR'}
         </div>
         <div>
           <p className="text-neutral-500 text-[13px] font-bold uppercase tracking-wider mb-0.5">Total Amount</p>
-          <p className="text-2xl font-bold text-neutral-900">{pro?.currency || 'Rs.'} {pro?.pricePerSession?.toLocaleString() || '3,000'} <span className="text-[15px] font-medium text-neutral-400">/ session</span></p>
+          <p className="text-2xl font-bold text-neutral-900">{pro?.currency || 'PKR'} {pro?.pricePerSession?.toLocaleString() || '3,000'} <span className="text-[15px] font-medium text-neutral-400">/ session</span></p>
         </div>
       </div>
 

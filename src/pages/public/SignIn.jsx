@@ -23,11 +23,17 @@ export default function SignIn() {
 
   const handleDemoLogin = async (role) => {
     setError('')
-    await login('demo@demohub.com', 'password123', role)
-    
-    // Auth store state handles role, we redirect based on the role chosen for demo
-    const target = from || (role === 'patient' ? '/patient' : role === 'professional' ? '/pro' : '/admin')
-    navigate(target, { replace: true })
+    try {
+      await login('demo@demohub.com', 'password123', role)
+      
+      // For demo logins, we always want to go to the specific dashboard the user requested,
+      // ignoring any previous 'from' redirect state that might be stale or unauthorized.
+      const state = useAuthStore.getState()
+      const target = state.role === 'patient' ? '/patient' : state.role === 'professional' ? '/pro' : '/admin'
+      navigate(target, { replace: true })
+    } catch (err) {
+      setError('Demo login failed. Please try again.')
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -43,7 +49,8 @@ export default function SignIn() {
     // but in a real app this would resolve role from DB.
     try {
       await login(email, password, 'patient')
-      const target = from || '/patient'
+      const state = useAuthStore.getState()
+      const target = from || (state.role === 'patient' ? '/patient' : state.role === 'professional' ? '/pro' : '/admin')
       navigate(target, { replace: true })
     } catch (err) {
       setError('Invalid credentials. Please try a demo account.')

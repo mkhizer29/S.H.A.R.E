@@ -11,6 +11,7 @@ import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Avatar from '../../components/ui/Avatar'
+import JoinSessionButton from '../../components/JoinSessionButton'
 
 const MOOD_EMOJIS = { 1: '😔', 2: '😟', 3: '😐', 4: '🙂', 5: '😊' }
 const MOOD_COLORS = { 1: 'text-alert', 2: 'text-orange-400', 3: 'text-neutral-500', 4: 'text-primary', 5: 'text-primary-hover' }
@@ -113,9 +114,20 @@ export default function PatientDashboard() {
                     </div>
                     <Badge variant="primary">{s.type}</Badge>
                   </div>
-                  <div className="flex items-center gap-2 mt-4 text-[14px] font-medium text-neutral-500 bg-surface-tinted p-3 rounded-xl">
-                    <Clock size={16} className="text-primary" />
-                    <span>{s.date} at {s.time} <span className="mx-2">•</span> {s.duration} min</span>
+                  <div className="flex items-center justify-between mt-4 bg-surface-tinted p-3 rounded-xl">
+                    <div className="flex items-center gap-2 text-[14px] font-medium text-neutral-500">
+                      <Clock size={16} className="text-primary" />
+                      <span>
+                        {new Date(s.startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {' '}
+                        {new Date(s.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <JoinSessionButton 
+                      startsAt={s.startsAt} 
+                      sessionId={s.id} 
+                      role="patient"
+                      size="sm"
+                    />
                   </div>
                 </Card>
               ))}
