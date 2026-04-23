@@ -30,7 +30,7 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     if (user?.uid) {
-      loadBookings(user.uid)
+      loadBookings(user.uid, 'patient')
     }
   }, [user?.uid, loadBookings])
 

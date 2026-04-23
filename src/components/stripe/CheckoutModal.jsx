@@ -4,6 +4,9 @@ import { Shield, X, CreditCard, CheckCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Elements } from '@stripe/react-stripe-js'
 import { stripePromise } from '../../lib/stripe'
+import { db } from '../../lib/firebase'
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { useAuthStore } from '../../stores/authStore'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 
@@ -13,19 +16,49 @@ function CheckoutForm({ pro, onClose }) {
   const [success, setSuccess] = useState(false)
   const [method, setMethod] = useState('card') // 'card' or 'bank'
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setProcessing(true)
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const { user } = useAuthStore.getState();
+      
+      if (!user) {
+        throw new Error("You must be signed in to book a session.");
+      }
+
+      // 1. Create the booking object
+      const bookingData = {
+        patientId: user.uid,
+        patientAlias: user.alias || user.name || 'Anonymous',
+        professionalId: pro.id || pro.uid || 'demo-pro',
+        proName: pro.name,
+        proSpecialty: pro.specialties?.join(', ') || pro.specialty || 'Professional',
+        startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Default to tomorrow for demo
+        duration: 50,
+        status: 'upcoming',
+        type: 'Video',
+        amount: pro.pricePerSession || 3000,
+        currency: pro.currency || 'PKR',
+        createdAt: serverTimestamp()
+      }
+
+      // 2. Write to Firestore
+      await addDoc(collection(db, 'bookings'), bookingData);
+
       setProcessing(false)
       setSuccess(true)
+      
+      // Delay navigation so user sees the success state
       setTimeout(() => {
         onClose()
-        navigate('/patient/chat')
+        navigate('/patient/bookings')
       }, 2000)
-    }, 2000)
+    } catch (error) {
+      console.error("Payment/Booking Error:", error);
+      setProcessing(false);
+      alert(error.message || "There was an error processing your booking. Please try again.");
+    }
   }
 
   if (success) {

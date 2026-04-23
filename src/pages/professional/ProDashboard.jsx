@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Users, Calendar as CalendarIcon, Banknote, MessageSquare, CheckCircle, TrendingUp, Phone, Clock } from 'lucide-react';
 import useAuthStore from '../../stores/authStore';
 import { useBookingStore } from '../../stores/bookingStore';
+import { useEffect } from 'react';
 import Card from '../../components/ui/Card';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
@@ -11,7 +12,13 @@ import JoinSessionButton from '../../components/JoinSessionButton';
 
 const ProDashboard = () => {
   const { user } = useAuthStore();
-  const { sessions } = useBookingStore();
+  const { sessions, loadBookings, isLoading } = useBookingStore();
+
+  useEffect(() => {
+    if (user?.uid) {
+      loadBookings(user.uid, 'professional')
+    }
+  }, [user?.uid, loadBookings])
 
   const stats = [
     { label: 'Active Clients', value: '12', icon: Users, trend: '+2 this month' },
@@ -72,32 +79,44 @@ const ProDashboard = () => {
               <button className="text-[14px] font-semibold text-primary hover:text-primary-hover transition-colors">View Calendar →</button>
             </div>
             <div className="space-y-4">
-              {upcomingSessions.map((session, idx) => (
-                <div key={idx} className="flex justify-between items-center p-4 rounded-2xl bg-surface-tinted border border-neutral-100 hover:border-primary-light transition-colors group">
-                  <div className="flex items-center gap-4">
-                    <Avatar name={session.client} size="md" />
-                    <div>
-                      <p className="font-bold text-[15px] text-neutral-900">{session.client}</p>
-                      <p className="text-[13px] font-medium text-neutral-500">{session.type}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-[14px] font-medium text-neutral-500">
-                      <Clock size={16} className="text-primary" />
-                      <span>
-                        {new Date(session.startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {' '}
-                        {new Date(session.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <JoinSessionButton 
-                      startsAt={session.startsAt} 
-                      sessionId={session.id} 
-                      role="professional" 
-                      size="sm"
-                    />
-                  </div>
+              {isLoading ? (
+                <div className="py-12 flex flex-col items-center gap-3">
+                  <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                  <p className="text-neutral-400 font-medium animate-pulse">Fetching your schedule...</p>
                 </div>
-              ))}
+              ) : upcomingSessions.length === 0 ? (
+                <div className="py-12 text-center bg-surface-tinted rounded-2xl border border-dashed border-neutral-200">
+                   <CalendarIcon size={32} className="text-neutral-300 mx-auto mb-3" />
+                   <p className="text-neutral-500 font-medium">No sessions scheduled for today.</p>
+                </div>
+              ) : (
+                upcomingSessions.map((session, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-4 rounded-2xl bg-surface-tinted border border-neutral-100 hover:border-primary-light transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <Avatar name={session.patientAlias || 'Anonymous'} size="md" />
+                      <div>
+                        <p className="font-bold text-[15px] text-neutral-900">{session.patientAlias || 'Anonymous'}</p>
+                        <p className="text-[13px] font-medium text-neutral-500">{session.type}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 text-[14px] font-medium text-neutral-500">
+                        <Clock size={16} className="text-primary" />
+                        <span>
+                          {new Date(session.startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} at {' '}
+                          {new Date(session.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <JoinSessionButton 
+                        startsAt={session.startsAt} 
+                        sessionId={session.id} 
+                        role="professional" 
+                        size="sm"
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
         </motion.div>

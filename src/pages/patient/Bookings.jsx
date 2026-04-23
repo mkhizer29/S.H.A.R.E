@@ -25,7 +25,7 @@ export default function Bookings() {
 
   useEffect(() => {
     if (user?.uid) {
-      loadBookings(user.uid)
+      loadBookings(user.uid, 'patient')
     }
   }, [user?.uid, loadBookings])
 

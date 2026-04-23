@@ -9,13 +9,14 @@ export const useBookingStore = create((set, get) => ({
   isLoading: false,
   error: null,
 
-  loadBookings: async (userId) => {
+  loadBookings: async (userId, role = 'patient') => {
     if (!userId) return;
     set({ isLoading: true, error: null });
     try {
+      const filterField = role === 'professional' ? 'professionalId' : 'patientId';
       const q = query(
         collection(db, 'bookings'),
-        where('patientId', '==', userId),
+        where(filterField, '==', userId),
         orderBy('startsAt', 'desc')
       );
       const snapshot = await getDocs(q);
