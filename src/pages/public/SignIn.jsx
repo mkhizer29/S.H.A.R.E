@@ -14,7 +14,7 @@ const DEMO_ACCOUNTS = [
 export default function SignIn() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login, isLoading } = useAuthStore()
+  const { login, demoLogin, isLoading } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -24,10 +24,9 @@ export default function SignIn() {
   const handleDemoLogin = async (role) => {
     setError('')
     try {
-      await login('demo@demohub.com', 'password123', role)
+      await demoLogin(role)
       
-      // For demo logins, we always want to go to the specific dashboard the user requested,
-      // ignoring any previous 'from' redirect state that might be stale or unauthorized.
+      // For demo logins, we always want to go to the specific dashboard the user requested
       const state = useAuthStore.getState()
       const target = state.role === 'patient' ? '/patient' : state.role === 'professional' ? '/pro' : '/admin'
       navigate(target, { replace: true })
@@ -45,15 +44,13 @@ export default function SignIn() {
       return
     }
 
-    // Defaulting to patient for direct sign-in mock as per current app bias, 
-    // but in a real app this would resolve role from DB.
     try {
-      await login(email, password, 'patient')
+      await login(email, password)
       const state = useAuthStore.getState()
       const target = from || (state.role === 'patient' ? '/patient' : state.role === 'professional' ? '/pro' : '/admin')
       navigate(target, { replace: true })
     } catch (err) {
-      setError('Invalid credentials. Please try a demo account.')
+      setError(err.message || 'Invalid credentials. Please try a demo account.')
     }
   }
 

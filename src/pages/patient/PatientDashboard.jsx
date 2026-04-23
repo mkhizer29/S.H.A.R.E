@@ -20,13 +20,19 @@ export default function PatientDashboard() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const { openModal, checkedToday, todayScore, getWeeklyAverage, history } = useMoodStore()
-  const { sessions } = useBookingStore()
+  const { sessions, loadBookings, isLoading } = useBookingStore()
   const { conversations } = useChatStore()
 
   const upcoming = sessions.filter((s) => s.status === 'upcoming').slice(0, 2)
   const unreadCount = conversations.reduce((sum, c) => sum + c.unread, 0)
   const weeklyAvg = getWeeklyAverage()
   const recentMoods = history.slice(-7)
+
+  useEffect(() => {
+    if (user?.uid) {
+      loadBookings(user.uid)
+    }
+  }, [user?.uid, loadBookings])
 
   useEffect(() => {
     if (!checkedToday) {
@@ -98,9 +104,18 @@ export default function PatientDashboard() {
           </div>
           {upcoming.length === 0 ? (
             <Card hover={false} className="p-8 text-center bg-surface-tinted border-dashed">
-              <Calendar size={36} className="text-neutral-400 mx-auto mb-4" />
-              <p className="text-[15px] font-medium text-neutral-500">No upcoming sessions</p>
-              <Button variant="primary" size="md" className="mt-6 font-semibold" onClick={() => navigate('/patient/directory')}>Find a Professional</Button>
+              {isLoading ? (
+                <div className="py-4 flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-3 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <p className="text-sm font-medium text-neutral-400 animate-pulse">Syncing sessions...</p>
+                </div>
+              ) : (
+                <>
+                  <Calendar size={36} className="text-neutral-400 mx-auto mb-4" />
+                  <p className="text-[15px] font-medium text-neutral-500">No upcoming sessions</p>
+                  <Button variant="primary" size="md" className="mt-6 font-semibold" onClick={() => navigate('/patient/directory')}>Find a Professional</Button>
+                </>
+              )}
             </Card>
           ) : (
             <div className="space-y-4">

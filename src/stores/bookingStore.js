@@ -1,32 +1,52 @@
 import { create } from 'zustand'
+import { db } from '../lib/firebase'
+import { collection, query, where, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore'
 
-const now = new Date()
-const tenMinsFromNow = new Date(now.getTime() + 10 * 60000).toISOString()
-const oneHourAgo = new Date(now.getTime() - 60 * 60000).toISOString()
-const yesterday = new Date(now.getTime() - 86400000).toISOString()
-const nextWeek = new Date(now.getTime() + 7 * 86400000).toISOString()
-
-const SESSIONS = [
-  { id: 's0', proName: 'Dr. Sarah Jenkins', proSpecialty: 'Ph.D, Licensed Psychologist', startsAt: tenMinsFromNow, duration: 50, status: 'upcoming', type: 'Voice Session', amount: 4500 },
-  { id: 's1', proName: 'Dr. Aisha Raza', proSpecialty: 'Anxiety & Trauma', startsAt: nextWeek, duration: 50, status: 'upcoming', type: 'Video', amount: 4500 },
-  { id: 's2', proName: 'Dr. Omar Shaikh', proSpecialty: 'Depression & CBT', startsAt: yesterday, duration: 60, status: 'upcoming', type: 'Text', amount: 3800 },
-  { id: 's3', proName: 'Dr. Aisha Raza', proSpecialty: 'Anxiety & Trauma', startsAt: oneHourAgo, duration: 50, status: 'completed', rating: 5, note: 'Great session on breathing techniques.', amount: 4500 },
-  { id: 's4', proName: 'Dr. Omar Shaikh', proSpecialty: 'Depression & CBT', startsAt: yesterday, duration: 60, status: 'completed', rating: 4, note: 'Discussed CBT worksheets.', amount: 3800 },
-]
+// Remove mock SESSIONS data
 
 export const useBookingStore = create((set, get) => ({
-  sessions: SESSIONS,
+  sessions: [],
+  isLoading: false,
+  error: null,
 
-  cancelSession: (id) => {
-    set((state) => ({
-      sessions: state.sessions.map((s) => s.id === id ? { ...s, status: 'cancelled' } : s),
-    }))
+  loadBookings: async (userId) => {
+    if (!userId) return;
+    set({ isLoading: true, error: null });
+    try {
+      const q = query(
+        collection(db, 'bookings'),
+        where('patientId', '==', userId),
+        orderBy('startsAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      set({ sessions: bookings, isLoading: false });
+    } catch (error) {
+      console.error("Error loading bookings:", error);
+      set({ error: error.message, isLoading: false });
+    }
   },
 
-  rateSession: (id, rating) => {
-    set((state) => ({
-      sessions: state.sessions.map((s) => s.id === id ? { ...s, rating } : s),
-    }))
+  cancelSession: async (id) => {
+    try {
+      await updateDoc(doc(db, 'bookings', id), { status: 'cancelled' });
+      set((state) => ({
+        sessions: state.sessions.map((s) => s.id === id ? { ...s, status: 'cancelled' } : s),
+      }))
+    } catch (error) {
+      console.error("Error cancelling session:", error);
+    }
+  },
+
+  rateSession: async (id, rating) => {
+    try {
+      await updateDoc(doc(db, 'bookings', id), { rating });
+      set((state) => ({
+        sessions: state.sessions.map((s) => s.id === id ? { ...s, rating } : s),
+      }))
+    } catch (error) {
+      console.error("Error rating session:", error);
+    }
   },
 
   getUpcoming: () => get().sessions.filter((s) => s.status === 'upcoming'),

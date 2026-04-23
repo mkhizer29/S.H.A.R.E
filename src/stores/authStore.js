@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { auth, db } from '../lib/firebase'
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { generateKeyPair } from '../lib/crypto'
 
 const DEMO_USERS = {
@@ -39,25 +39,78 @@ export const useAuthStore = create((set) => ({
   role: null,
   isAuthenticated: false,
   isLoading: false,
+  authInitialized: false,
 
-  login: async (email, password, role) => {
+  initializeAuth: () => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            set({ 
+              user: { uid: firebaseUser.uid, email: firebaseUser.email, ...userData },
+              role: userData.role,
+              isAuthenticated: true,
+              authInitialized: true
+            });
+          } else {
+            console.warn("User authenticated but profile document missing in Firestore.");
+            set({ user: null, role: null, isAuthenticated: false, authInitialized: true });
+          }
+        } catch (error) {
+          console.error("Auth rehydration error:", error);
+          set({ user: null, role: null, isAuthenticated: false, authInitialized: true });
+        }
+      } else {
+        set({ user: null, role: null, isAuthenticated: false, authInitialized: true });
+      }
+    });
+    return unsubscribe;
+  },
+
+  login: async (email, password) => {
     set({ isLoading: true })
     try {
       // Attempt real Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // Fetch user role from Firestore ideally here, but defaulting to passed role
-      set({ user: { uid: userCredential.user.uid, email, role }, role, isAuthenticated: true, isLoading: false })
+      const uid = userCredential.user.uid;
+
+      // Fetch user profile and role from Firestore
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const user = { uid, email, ...userData };
+        set({ 
+          user, 
+          role: userData.role, 
+          isAuthenticated: true, 
+          isLoading: false 
+        })
+        return user;
+      } else {
+        // Firebase user exists but Firestore doc is missing
+        console.error(`No Firestore document found for UID: ${uid}`);
+        set({ isLoading: false });
+        throw new Error("Your user profile is missing. Please contact support or sign up again.");
+      }
     } catch (error) {
-      console.warn("Firebase Auth Error (Missing keys?). Falling back to Mock Demo Data:", error.message);
-      // Fallback due to missing env variables or demo run
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const user = DEMO_USERS[role] || DEMO_USERS['patient']
-          set({ user, role, isAuthenticated: true, isLoading: false })
-          resolve(user)
-        }, 800)
-      })
+      set({ isLoading: false });
+      console.error("Login Error:", error.message);
+      throw error; // Propagate to UI
     }
+  },
+
+  demoLogin: async (role) => {
+    set({ isLoading: true })
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const user = DEMO_USERS[role] || DEMO_USERS['patient']
+        set({ user, role, isAuthenticated: true, isLoading: false })
+        resolve(user)
+      }, 600)
+    })
   },
 
   register: async (email, password, alias, role) => {
@@ -84,19 +137,19 @@ export const useAuthStore = create((set) => ({
 
       set({ user: { uid, email, alias, role }, role, isAuthenticated: true, isLoading: false })
     } catch (error) {
-      console.warn("Firebase Registration Error (Missing keys?). Falling back to Mock Demo Data:", error.message);
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const user = DEMO_USERS[role] || DEMO_USERS['patient']
-          set({ user, role, isAuthenticated: true, isLoading: false })
-          resolve(user)
-        }, 800)
-      })
+      set({ isLoading: false });
+      console.error("Registration Error:", error.message);
+      throw error;
     }
   },
 
-  logout: () => {
-    set({ user: null, role: null, isAuthenticated: false })
+  logout: async () => {
+    try {
+      await signOut(auth);
+      set({ user: null, role: null, isAuthenticated: false })
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   },
 
   updateUser: (updates) => {

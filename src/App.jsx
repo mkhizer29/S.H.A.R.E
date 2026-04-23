@@ -75,6 +75,26 @@ const ProtectedRoute = ({ children, allowedRole }) => {
 
 // Main App Router
 function App() {
+  const { authInitialized, initializeAuth } = useAuthStore();
+
+  useEffect(() => {
+    // Start listening to auth state changes and restore profile from Firestore
+    const unsubscribe = initializeAuth();
+    return () => unsubscribe();
+  }, [initializeAuth]);
+
+  // Loading gate: wait until auth state is determined before rendering the app
+  if (!authInitialized) {
+    return (
+      <div className="min-h-screen bg-lilac-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+          <p className="text-violet-600 font-bold text-sm tracking-wide uppercase animate-pulse">Initializing Secure Session...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>

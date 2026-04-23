@@ -8,6 +8,8 @@ import Avatar from '../../components/ui/Avatar'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import JoinSessionButton from '../../components/JoinSessionButton'
+import { useAuthStore } from '../../stores/authStore'
+import { useEffect } from 'react'
 
 const STATUS_CONFIG = {
   upcoming: { badge: 'teal', label: 'Upcoming', icon: Clock },
@@ -16,9 +18,16 @@ const STATUS_CONFIG = {
 }
 
 export default function Bookings() {
-  const { sessions, cancelSession } = useBookingStore()
+  const { user } = useAuthStore()
+  const { sessions, cancelSession, loadBookings, isLoading } = useBookingStore()
   const [tab, setTab] = useState('upcoming')
   const [cancelId, setCancelId] = useState(null)
+
+  useEffect(() => {
+    if (user?.uid) {
+      loadBookings(user.uid)
+    }
+  }, [user?.uid, loadBookings])
 
   const displayed = tab === 'upcoming'
     ? sessions.filter((s) => s.status === 'upcoming')
@@ -53,7 +62,12 @@ export default function Bookings() {
 
       {/* Sessions list */}
       <div className="space-y-4">
-        {displayed.length === 0 ? (
+        {isLoading ? (
+          <Card hover={false} className="p-12 text-center">
+            <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-text-secondary font-medium animate-pulse">Loading your sessions...</p>
+          </Card>
+        ) : displayed.length === 0 ? (
           <Card hover={false} className="p-12 text-center">
             <Calendar size={40} className="text-text-muted mx-auto mb-4" />
             <p className="font-display text-xl text-text-primary mb-2">No {tab === 'upcoming' ? 'upcoming' : 'past'} sessions</p>
