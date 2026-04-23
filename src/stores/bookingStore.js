@@ -13,17 +13,30 @@ export const useBookingStore = create((set, get) => ({
     if (!userId) return;
     set({ isLoading: true, error: null });
     try {
+      console.log(`[BookingStore] Loading bookings for ${role}: ${userId}`);
       const filterField = role === 'professional' ? 'professionalId' : 'patientId';
       const q = query(
         collection(db, 'bookings'),
-        where(filterField, '==', userId),
-        orderBy('startsAt', 'desc')
+        where(filterField, '==', userId)
       );
+      
       const snapshot = await getDocs(q);
-      const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(`[BookingStore] Found ${snapshot.docs.length} bookings`);
+      
+      const bookings = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log(`[BookingStore] Booking ${doc.id}:`, data);
+        Object.keys(data).forEach(key => {
+          if (data[key] && typeof data[key].toDate === 'function') {
+            data[key] = data[key].toDate().toISOString();
+          }
+        });
+        return { id: doc.id, ...data };
+      });
       set({ sessions: bookings, isLoading: false });
     } catch (error) {
-      console.error("Error loading bookings:", error);
+      console.error("[BookingStore] Error loading bookings from Firestore:", error);
+      // If it's an index error, the error message will contain the link to create it
       set({ error: error.message, isLoading: false });
     }
   },
@@ -50,6 +63,11 @@ export const useBookingStore = create((set, get) => ({
     }
   },
 
-  getUpcoming: () => get().sessions.filter((s) => s.status === 'upcoming'),
-  getPast: () => get().sessions.filter((s) => s.status === 'completed' || s.status === 'cancelled'),
+  getUpcoming: () => get().sessions
+    .filter((s) => s.status === 'upcoming')
+    .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)), // Closest first
+
+  getPast: () => get().sessions
+    .filter((s) => s.status !== 'upcoming')
+    .sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt)), // Most recent first
 }))

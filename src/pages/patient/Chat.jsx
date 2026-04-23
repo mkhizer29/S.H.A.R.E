@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Lock, MoreVertical, Phone, Video, MessageSquare } from 'lucide-react'
+import { Send, Lock, MoreVertical, Phone, MessageSquare, Sparkles } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
+import { useAuthStore } from '../../stores/authStore'
 import { useNavigate } from 'react-router-dom'
 import ChatBubble from '../../components/ChatBubble'
 import Avatar from '../../components/ui/Avatar'
@@ -9,15 +10,34 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 
 export default function Chat() {
-  const { conversations, activeConvId, setActiveConv, sendMessage, isTyping, getActiveConv } = useChatStore()
+  const { user } = useAuthStore()
+  const { 
+    conversations, 
+    activeMessages, 
+    activeConvId, 
+    setActiveConv, 
+    sendMessage, 
+    fetchConversations,
+    cleanup,
+    isTyping, 
+    getActiveConv 
+  } = useChatStore()
+  
   const [input, setInput] = useState('')
   const messagesEndRef = useRef(null)
   const activeConv = getActiveConv()
   const navigate = useNavigate()
 
   useEffect(() => {
+    if (user?.uid) {
+      fetchConversations(user.uid, 'patient')
+    }
+    return () => cleanup()
+  }, [user?.uid, fetchConversations, cleanup])
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [activeConv?.messages, isTyping])
+  }, [activeMessages, isTyping])
 
   const handleSend = () => {
     if (!input.trim()) return
@@ -38,6 +58,25 @@ export default function Chat() {
     }
   }
 
+  // Handle empty conversation list
+  if (conversations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center bg-surface border border-neutral-200 rounded-[40px] p-12 text-center shadow-soft" style={{ height: 'calc(100vh - 140px)' }}>
+        <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mb-6">
+          <MessageSquare size={32} className="text-primary" />
+        </div>
+        <h2 className="text-2xl font-bold text-neutral-900 tracking-tight mb-2">No Conversations Yet</h2>
+        <p className="text-[15px] text-neutral-500 mb-8 max-w-sm mx-auto">
+          Start your journey by connecting with one of our verified professionals.
+        </p>
+        <Button variant="primary" onClick={() => navigate('/patient/directory')} className="shadow-float flex items-center gap-2">
+          <Sparkles size={18} />
+          Find a Specialist
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex bg-surface border border-neutral-200 rounded-[32px] overflow-hidden shadow-soft" style={{ height: 'calc(100vh - 140px)' }}>
       {/* Conversation list */}
@@ -51,34 +90,37 @@ export default function Chat() {
         </div>
 
         <div className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
-          {conversations.map((conv) => (
-            <motion.button
-              key={conv.id}
-              whileHover={{ scale: 0.99 }}
-              onClick={() => setActiveConv(conv.id)}
-              className={`w-full px-4 py-4 rounded-2xl flex items-start gap-4 text-left transition-all ${
-                activeConvId === conv.id 
-                  ? 'bg-primary-light shadow-inner-soft' 
-                  : 'hover:bg-neutral-100'
-              }`}
-            >
-              <Avatar name={conv.proName} size="md" online={conv.id === 'conv-1' || conv.id === 'conv-3'} />
-              <div className="flex-1 min-w-0 pt-1">
-                <div className="flex items-center justify-between mb-1">
-                  <p className={`text-[15px] font-bold truncate ${activeConvId === conv.id ? 'text-primary' : 'text-neutral-900'}`}>
-                    {conv.proName}
-                  </p>
-                  <span className="text-[11px] font-semibold text-neutral-400 flex-shrink-0">{conv.lastTime}</span>
+          {conversations.map((conv) => {
+            const unreadCount = conv.unreadCount?.[user?.uid] || 0
+            return (
+              <motion.button
+                key={conv.id}
+                whileHover={{ scale: 0.99 }}
+                onClick={() => setActiveConv(conv.id)}
+                className={`w-full px-4 py-4 rounded-2xl flex items-start gap-4 text-left transition-all ${
+                  activeConvId === conv.id 
+                    ? 'bg-primary-light shadow-inner-soft' 
+                    : 'hover:bg-neutral-100'
+                }`}
+              >
+                <Avatar name={conv.proName} size="md" online={true} />
+                <div className="flex-1 min-w-0 pt-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className={`text-[15px] font-bold truncate ${activeConvId === conv.id ? 'text-primary' : 'text-neutral-900'}`}>
+                      {conv.proName}
+                    </p>
+                    <span className="text-[11px] font-semibold text-neutral-400 flex-shrink-0">{conv.lastTime}</span>
+                  </div>
+                  <p className="text-[13px] font-medium text-neutral-500 truncate">{conv.lastMessage}</p>
                 </div>
-                <p className="text-[13px] font-medium text-neutral-500 truncate">{conv.lastMessage}</p>
-              </div>
-              {conv.unread > 0 && (
-                <span className="w-5 h-5 bg-alert rounded-full text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
-                  {conv.unread}
-                </span>
-              )}
-            </motion.button>
-          ))}
+                {unreadCount > 0 && (
+                  <span className="w-5 h-5 bg-alert rounded-full text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
+                    {unreadCount}
+                  </span>
+                )}
+              </motion.button>
+            )
+          })}
         </div>
       </div>
 
@@ -87,15 +129,9 @@ export default function Chat() {
         <div className="flex-1 flex flex-col min-w-0 bg-surface">
           {/* Chat header */}
           <div className="px-6 py-4 border-b border-neutral-200 bg-surface flex items-center gap-4 flex-shrink-0 relative">
-            {/* Demo indicator banner */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-amber-200/50" />
-            
-            <Avatar name={activeConv.proName} size="md" online={activeConvId === 'conv-1'} />
+            <Avatar name={activeConv.proName} size="md" online={true} />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-bold text-neutral-900 text-lg tracking-tight truncate">{activeConv.proName}</p>
-                <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Demo Mode</span>
-              </div>
+              <p className="font-bold text-neutral-900 text-lg tracking-tight truncate">{activeConv.proName}</p>
               <p className="text-[13.5px] font-medium text-neutral-500 truncate">{activeConv.proSpecialty}</p>
             </div>
             
@@ -120,7 +156,7 @@ export default function Chat() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col">
-            {activeConv.messages.map((msg, i) => (
+            {activeMessages.map((msg, i) => (
               <ChatBubble key={msg.id} message={msg} index={i} />
             ))}
 

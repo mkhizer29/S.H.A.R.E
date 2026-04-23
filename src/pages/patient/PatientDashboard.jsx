@@ -19,11 +19,15 @@ const MOOD_COLORS = { 1: 'text-alert', 2: 'text-orange-400', 3: 'text-neutral-50
 export default function PatientDashboard() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const { openModal, checkedToday, todayScore, getWeeklyAverage, history } = useMoodStore()
-  const { sessions, loadBookings, isLoading } = useBookingStore()
-  const { conversations } = useChatStore()
+  const { openModal, fetchMoods, checkedToday, todayScore, getWeeklyAverage, history } = useMoodStore()
+  const { sessions, loadBookings, isLoading, getUpcoming, getPast, error } = useBookingStore()
+  const { conversations, fetchConversations } = useChatStore()
 
-  const upcoming = sessions.filter((s) => s.status === 'upcoming').slice(0, 2)
+  console.log('[PatientDashboard] Current User:', user?.uid);
+  console.log('[PatientDashboard] Sessions in store:', sessions);
+
+  const allUpcoming = getUpcoming()
+  const upcoming = allUpcoming.slice(0, 2)
   const unreadCount = conversations.reduce((sum, c) => sum + c.unread, 0)
   const weeklyAvg = getWeeklyAverage()
   const recentMoods = history.slice(-7)
@@ -31,8 +35,10 @@ export default function PatientDashboard() {
   useEffect(() => {
     if (user?.uid) {
       loadBookings(user.uid, 'patient')
+      fetchMoods(user.uid)
+      fetchConversations(user.uid, 'patient')
     }
-  }, [user?.uid, loadBookings])
+  }, [user?.uid, loadBookings, fetchMoods, fetchConversations])
 
   useEffect(() => {
     if (!checkedToday) {
@@ -77,7 +83,7 @@ export default function PatientDashboard() {
         {[
           { label: 'Mood Today', value: checkedToday ? MOOD_EMOJIS[todayScore] : '—', sub: checkedToday ? ['Very Low','Low','Okay','Good','Great'][todayScore-1] : 'Not checked', color: checkedToday ? MOOD_COLORS[todayScore] : 'text-neutral-400' },
           { label: 'Weekly Avg', value: weeklyAvg, sub: 'out of 5.0', color: 'text-primary' },
-          { label: 'Upcoming', value: upcoming.length, sub: upcoming.length === 1 ? 'session' : 'sessions', color: 'text-primary' },
+          { label: 'Upcoming', value: allUpcoming.length, sub: allUpcoming.length === 1 ? 'session' : 'sessions', color: 'text-primary' },
           { label: 'Unread', value: unreadCount, sub: unreadCount === 1 ? 'message' : 'messages', color: unreadCount > 0 ? 'text-alert' : 'text-neutral-400' },
         ].map((s, i) => (
           <motion.div
@@ -100,9 +106,14 @@ export default function PatientDashboard() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xl font-bold text-neutral-900 tracking-tight">Upcoming Sessions</h2>
-            <button onClick={() => navigate('/patient/bookings')} className="text-[14px] font-semibold text-primary hover:text-primary-hover transition-colors">View all →</button>
+            {allUpcoming.length > 0 && <button onClick={() => navigate('/patient/bookings')} className="text-[14px] font-semibold text-primary hover:text-primary-hover transition-colors">View all →</button>}
           </div>
-          {upcoming.length === 0 ? (
+          {error && (
+            <div className="p-4 bg-alert-light border border-alert-light rounded-2xl text-alert text-sm font-medium">
+              Error syncing schedule: {error}. Please check your connection.
+            </div>
+          )}
+          {upcoming.length === 0 && !error ? (
             <Card hover={false} className="p-8 text-center bg-surface-tinted border-dashed">
               {isLoading ? (
                 <div className="py-4 flex flex-col items-center gap-3">

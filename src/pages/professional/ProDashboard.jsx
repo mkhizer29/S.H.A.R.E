@@ -3,7 +3,9 @@ import { motion } from 'framer-motion';
 import { Users, Calendar as CalendarIcon, Banknote, MessageSquare, CheckCircle, TrendingUp, Phone, Clock } from 'lucide-react';
 import useAuthStore from '../../stores/authStore';
 import { useBookingStore } from '../../stores/bookingStore';
+import { useChatStore } from '../../stores/chatStore';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
@@ -11,14 +13,17 @@ import Button from '../../components/ui/Button';
 import JoinSessionButton from '../../components/JoinSessionButton';
 
 const ProDashboard = () => {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { sessions, loadBookings, isLoading } = useBookingStore();
+  const { conversations, fetchConversations } = useChatStore();
 
   useEffect(() => {
     if (user?.uid) {
       loadBookings(user.uid, 'professional')
+      fetchConversations(user.uid, 'pro')
     }
-  }, [user?.uid, loadBookings])
+  }, [user?.uid, loadBookings, fetchConversations])
 
   const stats = [
     { label: 'Active Clients', value: '12', icon: Users, trend: '+2 this month' },
@@ -124,23 +129,38 @@ const ProDashboard = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 }}>
           <Card hover={false} className="p-6 md:p-8 h-full">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-neutral-900 tracking-tight">Action Items</h3>
-              <span className="bg-alert text-white text-[12px] font-bold px-3 py-1 rounded-full shadow-sm">2 Actions</span>
+              <h3 className="text-xl font-bold text-neutral-900 tracking-tight">Recent Activity</h3>
+              <button onClick={() => navigate('/pro/inbox')} className="text-[14px] font-semibold text-primary hover:text-primary-hover transition-colors">View All →</button>
             </div>
             <div className="space-y-4">
-              <div className="p-5 rounded-2xl bg-accent-light/40 border border-accent-light flex gap-4 items-start">
-                <MessageSquare className="w-5 h-5 text-accent-hover mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-bold text-neutral-900 text-[15px] mb-1">New message from RiverStone</p>
-                  <p className="text-[14px] font-medium text-neutral-600">"I have a question about our next session..."</p>
-                  <button className="text-[13px] font-bold text-accent-hover mt-3 hover:text-accent transition-colors">Reply Now →</button>
+              {conversations.length === 0 ? (
+                <div className="py-8 text-center bg-surface-tinted rounded-2xl border border-dashed border-neutral-200">
+                  <MessageSquare size={24} className="text-neutral-300 mx-auto mb-2" />
+                  <p className="text-neutral-500 text-sm font-medium">No recent messages.</p>
                 </div>
-              </div>
+              ) : (
+                conversations.slice(0, 2).map((conv) => {
+                  const unreadCount = conv.unreadBy?.includes(user?.uid) || (conv.unreadCount?.[user?.uid] > 0)
+                  return (
+                    <div key={conv.id} className={`p-5 rounded-2xl border flex gap-4 items-start transition-all ${unreadCount ? 'bg-primary-light/40 border-primary-light' : 'bg-surface-tinted border-neutral-100'}`}>
+                      <Avatar name={conv.patientName || 'Patient'} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="font-bold text-neutral-900 text-[15px] truncate">{conv.patientName || 'Anonymous'}</p>
+                          <span className="text-[11px] font-semibold text-neutral-400">{conv.lastTime}</span>
+                        </div>
+                        <p className="text-[14px] font-medium text-neutral-600 truncate">{conv.lastMessage}</p>
+                        <button onClick={() => navigate('/pro/inbox')} className="text-[13px] font-bold text-primary mt-2 hover:text-primary-hover transition-colors">Reply →</button>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
               <div className="p-5 rounded-2xl bg-alert-light/50 border border-alert-light flex gap-4 items-start">
                 <CheckCircle className="w-5 h-5 text-alert mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-bold text-neutral-900 text-[15px] mb-1">Action Required: Intake Notes</p>
-                  <p className="text-[14px] font-medium text-neutral-600">Please complete your notes for the session with MountainPine.</p>
+                  <p className="text-[14px] font-medium text-neutral-600">Please complete your notes for recent sessions.</p>
                   <button className="text-[13px] font-bold text-alert mt-3 hover:text-red-500 transition-colors">Complete Notes →</button>
                 </div>
               </div>

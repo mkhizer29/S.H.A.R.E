@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { useMoodStore } from '../../stores/moodStore'
+import { useAuthStore } from '../../stores/authStore'
+import { useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import Button from '../../components/ui/Button'
 import { useNavigate } from 'react-router-dom'
@@ -24,7 +26,14 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function MoodHistory() {
   const navigate = useNavigate()
-  const { history, getChartData, getWeeklyAverage, openModal, checkedToday } = useMoodStore()
+  const { user } = useAuthStore()
+  const { history, fetchMoods, getChartData, getWeeklyAverage, openModal, checkedToday } = useMoodStore()
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetchMoods(user.uid)
+    }
+  }, [user?.uid, fetchMoods])
 
   const chartData = getChartData()
   const weeklyAvg = parseFloat(getWeeklyAverage())

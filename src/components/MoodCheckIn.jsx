@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMoodStore } from '../stores/moodStore'
+import { useAuthStore } from '../stores/authStore'
 import { Sparkles } from 'lucide-react'
 import Button from './ui/Button'
 
@@ -14,12 +15,13 @@ const MOODS = [
 
 export default function MoodCheckIn() {
   const { showModal, closeModal, submitMood } = useMoodStore()
+  const { user } = useAuthStore()
   const [selected, setSelected] = useState(null)
   const [submitted, setSubmitted] = useState(false)
 
   const handleSubmit = () => {
     if (!selected) return
-    submitMood(selected)
+    submitMood(selected, user?.uid)
     setSubmitted(true)
     setTimeout(() => {
       setSubmitted(false)

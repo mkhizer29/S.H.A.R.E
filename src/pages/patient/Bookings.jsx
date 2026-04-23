@@ -19,7 +19,7 @@ const STATUS_CONFIG = {
 
 export default function Bookings() {
   const { user } = useAuthStore()
-  const { sessions, cancelSession, loadBookings, isLoading } = useBookingStore()
+  const { sessions, cancelSession, loadBookings, isLoading, getUpcoming, getPast, error } = useBookingStore()
   const [tab, setTab] = useState('upcoming')
   const [cancelId, setCancelId] = useState(null)
 
@@ -29,9 +29,7 @@ export default function Bookings() {
     }
   }, [user?.uid, loadBookings])
 
-  const displayed = tab === 'upcoming'
-    ? sessions.filter((s) => s.status === 'upcoming')
-    : sessions.filter((s) => s.status !== 'upcoming')
+  const displayed = tab === 'upcoming' ? getUpcoming() : getPast()
 
   const handleCancel = () => {
     if (cancelId) {
@@ -44,7 +42,7 @@ export default function Bookings() {
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="font-display text-3xl text-text-primary mb-1">My Sessions</h1>
-        <p className="text-text-secondary text-sm">{sessions.filter((s) => s.status === 'upcoming').length} upcoming session{sessions.filter((s) => s.status === 'upcoming').length !== 1 ? 's' : ''} scheduled</p>
+        <p className="text-text-secondary text-sm">{getUpcoming().length} upcoming session{getUpcoming().length !== 1 ? 's' : ''} scheduled</p>
       </motion.div>
 
       {/* Tabs */}
@@ -59,6 +57,12 @@ export default function Bookings() {
           </button>
         ))}
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-alert/10 border border-alert/20 rounded-2xl text-alert text-sm font-medium">
+          Failed to load bookings: {error}
+        </div>
+      )}
 
       {/* Sessions list */}
       <div className="space-y-4">
