@@ -1,7 +1,16 @@
 import { motion } from 'framer-motion'
+import { useAuthStore } from '../stores/authStore'
 
 export default function ChatBubble({ message, index }) {
-  const isSent = message.from === 'me'
+  const { user } = useAuthStore()
+  const isSent = message.senderId === user?.uid
+
+  const formatTime = (ts) => {
+    if (!ts) return 'Just now'
+    if (typeof ts === 'string') return ts // For backward compat
+    if (ts.toDate) return ts.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return 'Just now'
+  }
 
   return (
     <motion.div
@@ -20,11 +29,11 @@ export default function ChatBubble({ message, index }) {
         <p className="text-[15px] font-medium leading-relaxed">{message.text}</p>
         <div className={`flex items-center gap-1.5 mt-1.5 ${isSent ? 'justify-end' : 'justify-start'}`}>
           <span className={`text-[11px] font-semibold ${isSent ? 'text-primary-light' : 'text-neutral-400'}`}>
-            {message.time}
+            {formatTime(message.timestamp || message.time)}
           </span>
           {isSent && (
-            <span className={`text-[12px] font-bold ${message.read ? 'text-white' : 'text-primary-light'}`}>
-              {message.read ? '✓✓' : '✓'}
+            <span className={`text-[12px] font-bold text-primary-light`}>
+              ✓
             </span>
           )}
         </div>

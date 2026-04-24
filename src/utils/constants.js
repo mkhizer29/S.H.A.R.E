@@ -45,6 +45,14 @@ export const MOOD_LEVELS = [
 ];
 
 export const SPECIALTIES = [
-  'Anxiety', 'Depression', 'Trauma', 'Couples', 'Family', 
-  'Addiction', 'Grief', 'Stress', 'Career', 'Identity'
+  'Anxiety', 'Depression', 'Trauma & PTSD', 'Grief & Loss', 
+  'Addiction', 'CBT', 'Family Therapy', 'Child Psychology', 
+  'Burnout', 'Bipolar Disorder', 'Stress', 'Career', 'Identity'
 ];
+
+export const LANGUAGES = [
+  'English', 'Urdu', 'Arabic', 'Hindi', 'Farsi', 
+  'Twi', 'Malayalam', 'Gujarati'
+];
+
+export const SESSION_TYPES = ['Video', 'Text', 'Async'];

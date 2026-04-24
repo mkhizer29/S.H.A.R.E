@@ -1,13 +1,15 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, SlidersHorizontal, X } from 'lucide-react'
-import { PROFESSIONALS, SPECIALTIES, LANGUAGES } from '../../data/professionals'
+import { Search, SlidersHorizontal, X, Loader2 } from 'lucide-react'
+import { SPECIALTIES, LANGUAGES } from '../../utils/constants'
+import { useProStore } from '../../stores/proStore'
 import ProfessionalCard from '../../components/ProfessionalCard'
 import Input from '../../components/ui/Input'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 
 export default function Directory() {
+  const { professionals, isLoading, fetchProfessionals } = useProStore()
   const [query, setQuery] = useState('')
   const [selectedSpecialty, setSelectedSpecialty] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('')
@@ -15,16 +17,24 @@ export default function Directory() {
   const [showAvailableToday, setShowAvailableToday] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
 
+  useEffect(() => {
+    fetchProfessionals()
+  }, [fetchProfessionals])
+
   const filtered = useMemo(() => {
-    return PROFESSIONALS.filter((p) => {
-      if (query && !p.name.toLowerCase().includes(query.toLowerCase()) && !p.specialties.some((s) => s.toLowerCase().includes(query.toLowerCase()))) return false
-      if (selectedSpecialty && !p.specialties.includes(selectedSpecialty)) return false
-      if (selectedLanguage && !p.languages.includes(selectedLanguage)) return false
+    return professionals.filter((p) => {
+      const nameMatch = p.name?.toLowerCase().includes(query.toLowerCase())
+      const specialtyMatch = p.specialties?.some((s) => s.toLowerCase().includes(query.toLowerCase()))
+      const titleMatch = p.title?.toLowerCase().includes(query.toLowerCase())
+      
+      if (query && !nameMatch && !specialtyMatch && !titleMatch) return false
+      if (selectedSpecialty && !p.specialties?.includes(selectedSpecialty)) return false
+      if (selectedLanguage && !p.languages?.includes(selectedLanguage)) return false
       if (showVerifiedOnly && !p.verified) return false
-      if (showAvailableToday && !p.availability.includes('Today')) return false
+      if (showAvailableToday && !p.availability?.includes('Today')) return false
       return true
     })
-  }, [query, selectedSpecialty, selectedLanguage, showVerifiedOnly, showAvailableToday])
+  }, [professionals, query, selectedSpecialty, selectedLanguage, showVerifiedOnly, showAvailableToday])
 
   const activeFilterCount = [selectedSpecialty, selectedLanguage, showVerifiedOnly, showAvailableToday].filter(Boolean).length
 
@@ -40,7 +50,7 @@ export default function Directory() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-1">
         <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Find a Professional</h1>
-        <p className="text-neutral-500 text-[15px]">{PROFESSIONALS.filter(p => p.verified).length} verified specialists available to support you.</p>
+        <p className="text-neutral-500 text-[15px]">{professionals.filter(p => p.verified).length} verified specialists available to support you.</p>
       </motion.div>
 
       {/* Search + filter bar */}
@@ -171,7 +181,12 @@ export default function Directory() {
       </div>
 
       {/* Results */}
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-32 bg-surface rounded-[40px] border border-neutral-100">
+          <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+          <p className="text-neutral-500 font-medium">Fetching professionals...</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 bg-surface rounded-[40px] border-2 border-dashed border-neutral-200">
           <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-6">
             <Search size={32} className="text-primary" />

@@ -7,6 +7,7 @@ import { stripePromise } from '../../lib/stripe'
 import { db } from '../../lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { useAuthStore } from '../../stores/authStore'
+import { useChatStore } from '../../stores/chatStore'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 
@@ -27,13 +28,16 @@ function CheckoutForm({ pro, onClose }) {
         throw new Error("You must be signed in to book a session.");
       }
 
-      // 1. Create the booking object
+      const proId = pro.id || pro.uid || 'demo-pro'
+      const specialty = Array.isArray(pro.specialties) ? pro.specialties.join(', ') : (pro.specialties || pro.title || 'Specialist')
+
+      // 1. Create the booking object with exact requested fields
       const bookingData = {
         patientId: user.uid,
         patientAlias: user.alias || user.name || 'Anonymous',
-        professionalId: pro.id || pro.uid || 'demo-pro',
-        proName: pro.name,
-        proSpecialty: pro.specialties?.join(', ') || pro.specialty || 'Professional',
+        professionalId: proId,
+        proName: pro.name || 'Specialist',
+        proSpecialty: specialty,
         startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Default to tomorrow for demo
         duration: 50,
         status: 'upcoming',
@@ -43,13 +47,17 @@ function CheckoutForm({ pro, onClose }) {
         createdAt: serverTimestamp()
       }
 
+      console.log('[Checkout] Creating real booking in Firestore:', bookingData);
+
       // 2. Write to Firestore
       await addDoc(collection(db, 'bookings'), bookingData);
+
+      // 3. Ensure a conversation exists for the chat system
+      await useChatStore.getState().ensureConversation(pro);
 
       setProcessing(false)
       setSuccess(true)
       
-      // Delay navigation so user sees the success state
       setTimeout(() => {
         onClose()
         navigate('/patient/bookings')

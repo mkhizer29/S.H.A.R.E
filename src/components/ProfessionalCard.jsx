@@ -45,23 +45,25 @@ export default function ProfessionalCard({ pro, index = 0 }) {
 
         {/* Specialties */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {pro.specialties.slice(0, 3).map((s) => (
+          {pro.specialties?.slice(0, 3).map((s) => (
             <Badge key={s} variant="primary">{s}</Badge>
-          ))}
+          )) || <Badge variant="primary">Specialist</Badge>}
         </div>
 
         {/* About */}
-        <p className="text-[14px] text-neutral-500 line-clamp-3 leading-relaxed mb-4 flex-1">{pro.about}</p>
+        <p className="text-[14px] text-neutral-500 line-clamp-3 leading-relaxed mb-4 flex-1">
+          {pro.about || "Experienced specialist dedicated to providing supportive care and expert guidance."}
+        </p>
 
         {/* Meta */}
         <div className="flex items-center justify-between text-[13px] font-medium text-neutral-400 bg-surface-tinted p-3 rounded-xl mb-5">
           <span className="flex items-center gap-1.5">
             <Globe size={14} className="text-neutral-500" />
-            {pro.languages.slice(0, 2).join(', ')}
+            {pro.languages?.slice(0, 2).join(', ') || 'English'}
           </span>
           <span className="flex items-center gap-1.5 border-l border-neutral-300 pl-3">
             <Clock size={14} className="text-neutral-500" />
-            {pro.experience} yrs exp.
+            {pro.experience || 5} yrs exp.
           </span>
         </div>
 
@@ -70,7 +72,7 @@ export default function ProfessionalCard({ pro, index = 0 }) {
           <div>
             <p className="text-[12px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Next available</p>
             <p className={`text-[14px] font-semibold ${pro.online ? 'text-primary' : 'text-neutral-600'}`}>
-              {pro.nextSlot}
+              {pro.nextSlot || 'Consultation available'}
             </p>
           </div>
           <Button

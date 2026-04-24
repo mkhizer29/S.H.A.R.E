@@ -36,7 +36,7 @@ export default function Chat() {
   }, [user?.uid, fetchConversations, cleanup])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [activeMessages, isTyping])
 
   const handleSend = () => {
@@ -61,7 +61,7 @@ export default function Chat() {
   // Handle empty conversation list
   if (conversations.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center bg-surface border border-neutral-200 rounded-[40px] p-12 text-center shadow-soft" style={{ height: 'calc(100vh - 140px)' }}>
+      <div className="flex flex-col items-center justify-center bg-surface border border-neutral-200 rounded-[40px] p-12 text-center shadow-soft h-full">
         <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mb-6">
           <MessageSquare size={32} className="text-primary" />
         </div>
@@ -78,7 +78,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex bg-surface border border-neutral-200 rounded-[32px] overflow-hidden shadow-soft" style={{ height: 'calc(100vh - 140px)' }}>
+    <div className="flex bg-surface border border-neutral-200 shadow-soft overflow-hidden h-full">
       {/* Conversation list */}
       <div className="w-[320px] border-r border-neutral-200 bg-surface-tinted flex flex-col flex-shrink-0">
         <div className="p-6 border-b border-neutral-200">

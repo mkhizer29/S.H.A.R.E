@@ -123,7 +123,7 @@ export const useAuthStore = create((set) => ({
       // 2. Generate E2E Crypto Keys for the user locally
       const keys = generateKeyPair();
 
-      // 3. Store the Public Key and role in Firestore openly, KEEP SECRET KEY LOCAL
+      // 3. Store the Public Key and role in Firestore openly
       await setDoc(doc(db, 'users', uid), {
         email,
         alias,
@@ -132,7 +132,25 @@ export const useAuthStore = create((set) => ({
         createdAt: new Date().toISOString()
       });
 
-      // (In production, the SecretKey should be encrypted with the password and stored, or kept exclusively in local Storage/session.)
+      // 4. If professional, initialize their public profile
+      if (role === 'professional') {
+        await setDoc(doc(db, 'professionals', uid), {
+          name: alias, // Alias serves as Full Name for pros in signup
+          email,
+          role,
+          specialties: [],
+          languages: ['English'],
+          rating: 5.0,
+          reviewCount: 0,
+          sessionCount: 0,
+          verified: false,
+          about: '',
+          publicKey: keys.publicKey, // Shared for E2E chat handshake
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // Keep SecretKey locally
       localStorage.setItem(`SHARE_SECRET_${uid}`, keys.secretKey);
 
       set({ user: { uid, email, alias, role }, role, isAuthenticated: true, isLoading: false })

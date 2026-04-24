@@ -20,9 +20,14 @@ export default function SignUp() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    await register(email, password, alias, selectedRole)
-    if (selectedRole === 'patient') navigate('/patient')
-    else navigate('/pro')
+    try {
+      await register(email, password, alias, selectedRole)
+      if (selectedRole === 'patient') navigate('/patient')
+      else navigate('/pro')
+    } catch (error) {
+      console.error('Signup error:', error)
+      alert(error.message || 'Failed to create account. Please try again.')
+    }
   }
 
   return (

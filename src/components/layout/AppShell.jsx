@@ -11,7 +11,7 @@ export default function AppShell() {
   const { role } = useAuthStore();
 
   return (
-    <div className="flex h-screen w-screen bg-background overflow-hidden relative">
+    <div className="fixed inset-0 flex bg-background overflow-hidden select-none">
       {/* Decorative ultra-light blurred blobs for the soft lilac vibe */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary-light/40 blur-[100px] pointer-events-none z-0" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] rounded-full bg-accent-light/40 blur-[100px] pointer-events-none z-0" />
@@ -27,22 +27,34 @@ export default function AppShell() {
         <TopNav />
 
         {/* Scrollable Page Outlet with Framer Motion Page Fades */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden relative">
+        <main className={`flex-1 overflow-x-hidden relative ${
+          location.pathname.includes('/chat') || location.pathname.includes('/inbox') || location.pathname.includes('/messages')
+            ? 'overflow-hidden' 
+            : 'overflow-y-auto'
+        }`}>
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full min-h-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8"
+            className={`w-full mx-auto ${
+              location.pathname.includes('/chat') || location.pathname.includes('/inbox') || location.pathname.includes('/messages')
+                ? 'h-full' 
+                : 'min-h-full max-w-7xl p-4 sm:p-6 lg:p-8'
+            }`}
           >
             <Outlet />
           </motion.div>
         </main>
       </div>
 
-      {/* Panic Button — Patient only */}
-      {role === 'patient' && <PanicButton />}
+      {/* Panic Button — Patient only, hidden on chat pages to avoid layout clutter */}
+      {role === 'patient' && 
+       !location.pathname.includes('/chat') && 
+       !location.pathname.includes('/inbox') && 
+       !location.pathname.includes('/messages') && 
+       <PanicButton />}
     </div>
   );
 }

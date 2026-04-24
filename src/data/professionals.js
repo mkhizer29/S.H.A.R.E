@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use Firestore 'professionals' collection via useProStore instead.
+ * Keeping for backward compatibility and seed reference.
+ */
+/*
 export const PROFESSIONALS = [
   {
     id: 'pro-001',
@@ -172,3 +177,4 @@ export const PROFESSIONALS = [
 export const SPECIALTIES = ['Anxiety', 'Depression', 'Trauma & PTSD', 'Grief & Loss', 'Addiction', 'CBT', 'Family Therapy', 'Child Psychology', 'Burnout', 'Bipolar Disorder']
 export const LANGUAGES = ['English', 'Urdu', 'Arabic', 'Hindi', 'Farsi', 'Twi', 'Malayalam', 'Gujarati']
 export const SESSION_TYPES = ['Video', 'Text', 'Async']
+*/

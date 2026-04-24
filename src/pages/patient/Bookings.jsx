@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Calendar, Clock, Star, X, ChevronRight, CheckCircle, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, Star, X, ChevronRight, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react'
 import { useBookingStore } from '../../stores/bookingStore'
+import { useChatStore } from '../../stores/chatStore'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Avatar from '../../components/ui/Avatar'
@@ -10,6 +11,7 @@ import Modal from '../../components/ui/Modal'
 import JoinSessionButton from '../../components/JoinSessionButton'
 import { useAuthStore } from '../../stores/authStore'
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const STATUS_CONFIG = {
   upcoming: { badge: 'teal', label: 'Upcoming', icon: Clock },
@@ -18,8 +20,10 @@ const STATUS_CONFIG = {
 }
 
 export default function Bookings() {
+  const navigate = useNavigate()
   const { user } = useAuthStore()
   const { sessions, cancelSession, loadBookings, isLoading, getUpcoming, getPast, error } = useBookingStore()
+  const { ensureConversation, setActiveConv } = useChatStore()
   const [tab, setTab] = useState('upcoming')
   const [cancelId, setCancelId] = useState(null)
 
@@ -30,6 +34,35 @@ export default function Bookings() {
   }, [user?.uid, loadBookings])
 
   const displayed = tab === 'upcoming' ? getUpcoming() : getPast()
+
+  const [isConnecting, setIsConnecting] = useState(false)
+
+  const handleMessage = async (s) => {
+    if (isConnecting) return
+    setIsConnecting(true)
+    
+    console.log('[Bookings] Messaging pro:', s.proName, s.professionalId)
+    try {
+      const convId = await ensureConversation({
+        id: s.professionalId,
+        name: s.proName,
+        title: s.proSpecialty
+      })
+      
+      console.log('[Bookings] ensureConversation returned:', convId)
+      
+      if (convId) {
+        setActiveConv(convId)
+        navigate('/patient/chat')
+      } else {
+        alert("Could not establish a secure connection. Please check your internet or try again later.")
+      }
+    } catch (e) {
+      console.error('[Bookings] Error in handleMessage:', e)
+    } finally {
+      setIsConnecting(false)
+    }
+  }
 
   const handleCancel = () => {
     if (cancelId) {
@@ -140,6 +173,16 @@ export default function Bookings() {
                       role="patient" 
                       size="sm" 
                     />
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleMessage(s)}
+                      disabled={isConnecting}
+                      className="flex items-center gap-2"
+                    >
+                      <MessageSquare size={14} />
+                      {isConnecting ? 'Connecting...' : 'Message'}
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setCancelId(s.id)}>Cancel</Button>
                   </div>
                 )}

@@ -10,17 +10,17 @@ import Badge from '../../components/ui/Badge';
 const Inbox = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { 
-    conversations, 
-    activeMessages, 
-    activeConvId, 
-    setActiveConv, 
-    sendMessage, 
+  const {
+    conversations,
+    activeMessages,
+    activeConvId,
+    setActiveConv,
+    sendMessage,
     fetchConversations,
     cleanup,
-    getActiveConv 
+    getActiveConv
   } = useChatStore();
-  
+
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   const activeConv = getActiveConv();
@@ -33,7 +33,7 @@ const Inbox = () => {
   }, [user?.uid, fetchConversations, cleanup]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [activeMessages]);
 
   const handleSend = () => {
@@ -57,7 +57,7 @@ const Inbox = () => {
 
   if (conversations.length === 0) {
     return (
-      <div className="h-[calc(100vh-120px)] bg-surface rounded-[32px] border border-neutral-200 shadow-soft flex flex-col items-center justify-center p-12 text-center">
+      <div className="flex flex-col items-center justify-center bg-surface border border-neutral-200 rounded-[40px] p-12 text-center shadow-soft h-full">
         <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mb-6">
           <MessageSquare size={32} className="text-primary" />
         </div>
@@ -70,17 +70,17 @@ const Inbox = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-120px)] bg-surface rounded-[32px] border border-neutral-200 shadow-soft flex overflow-hidden">
-      
+    <div className="bg-surface border-l border-neutral-200 flex overflow-hidden h-full">
+
       {/* Sidebar */}
       <div className="w-[320px] border-r border-neutral-200 flex flex-col bg-surface-tinted">
         <div className="p-6 border-b border-neutral-200">
           <h2 className="text-xl font-bold text-neutral-900 tracking-tight mb-4">Inbox</h2>
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-neutral-400 w-4 h-4" />
-            <input 
-              type="text" 
-              placeholder="Search clients..." 
+            <input
+              type="text"
+              placeholder="Search clients..."
               className="w-full bg-surface border border-neutral-200 rounded-2xl py-2.5 pl-10 pr-4 text-[14px] font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-neutral-400"
             />
           </div>
@@ -90,14 +90,13 @@ const Inbox = () => {
           {conversations.map((conv) => {
             const unreadCount = conv.unreadCount?.[user?.uid] || 0;
             return (
-              <div 
-                key={conv.id} 
+              <div
+                key={conv.id}
                 onClick={() => setActiveConv(conv.id)}
-                className={`p-4 rounded-2xl cursor-pointer flex gap-4 transition-all ${
-                  activeConvId === conv.id 
-                    ? 'bg-primary-light shadow-inner-soft' 
-                    : 'hover:bg-neutral-100'
-                }`}
+                className={`p-4 rounded-2xl cursor-pointer flex gap-4 transition-all ${activeConvId === conv.id
+                  ? 'bg-primary-light shadow-inner-soft'
+                  : 'hover:bg-neutral-100'
+                  }`}
               >
                 <Avatar name={conv.patientName || 'Patient'} size="md" online={activeConvId === conv.id} />
                 <div className="flex-1 min-w-0 pt-1">
@@ -138,14 +137,14 @@ const Inbox = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <div className="flex items-center bg-primary-light/50 p-1 rounded-2xl border border-primary-light">
-                <button 
+                <button
                   onClick={startSession}
                   className="px-4 py-2 flex items-center gap-2 rounded-xl text-[14px] font-bold text-primary hover:bg-primary hover:text-white transition-all shadow-sm"
                 >
-                  <Phone size={16} /> 
+                  <Phone size={16} />
                   <span>Start Voice Session</span>
                 </button>
               </div>
@@ -166,20 +165,19 @@ const Inbox = () => {
           {/* Input */}
           <div className="px-6 py-5 border-t border-neutral-200 bg-surface-tinted">
             <div className="flex items-center gap-4">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Write your securely encrypted message..." 
+                placeholder="Write your securely encrypted message..."
                 className="flex-1 bg-surface border-2 border-neutral-200 rounded-[20px] py-4 px-5 text-[15px] font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-neutral-400"
               />
-              <button 
+              <button
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className={`w-[52px] h-[52px] rounded-2xl flex justify-center items-center shadow-soft transition-all flex-shrink-0 ${
-                  input.trim() ? 'bg-primary text-white hover:bg-primary-hover' : 'bg-neutral-200 text-neutral-400'
-                }`}
+                className={`w-[52px] h-[52px] rounded-2xl flex justify-center items-center shadow-soft transition-all flex-shrink-0 ${input.trim() ? 'bg-primary text-white hover:bg-primary-hover' : 'bg-neutral-200 text-neutral-400'
+                  }`}
               >
                 <Send className="w-5 h-5 ml-1" />
               </button>

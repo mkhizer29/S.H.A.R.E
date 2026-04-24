@@ -7,169 +7,211 @@ import {
   onSnapshot, 
   addDoc, 
   updateDoc, 
+  setDoc,
   doc, 
+  getDoc,
+  getDocs,
   orderBy, 
   serverTimestamp,
-  increment
+  increment,
+  writeBatch
 } from 'firebase/firestore'
-import { encryptMessage, decryptMessage } from '../lib/crypto'
 import { useAuthStore } from './authStore'
 
 export const useChatStore = create((set, get) => ({
   conversations: [],
   activeMessages: [],
   activeConvId: null,
-  isTyping: false,
   isLoading: false,
   error: null,
   
-  // Unsubscribe functions for cleanup
   _convUnsubscribe: null,
   _msgUnsubscribe: null,
 
-  fetchConversations: (uid, role = 'patient') => {
-    if (!uid) return
+  fetchConversations: (userId, role = 'patient') => {
+    if (!userId) return;
     
-    // Cleanup existing subscription if any
-    const { _convUnsubscribe } = get()
-    if (_convUnsubscribe) _convUnsubscribe()
+    // Cleanup previous subscription and clear state to avoid data leakage
+    const { _convUnsubscribe, _msgUnsubscribe } = get();
+    if (_convUnsubscribe) _convUnsubscribe();
+    if (_msgUnsubscribe) _msgUnsubscribe();
 
-    const field = role === 'patient' ? 'patientUid' : 'proUid'
+    set({ conversations: [], activeMessages: [], activeConvId: null, isLoading: true, error: null });
+    
+    console.log(`[ChatStore] Subscribing to conversations for ${role}: ${userId}`);
+    const isPro = role === 'professional' || role === 'pro' || role === 'specialist';
+    const filterField = isPro ? 'proUid' : 'patientUid';
+    
     const q = query(
       collection(db, 'conversations'),
-      where(field, '==', uid),
-      orderBy('lastTimestamp', 'desc')
-    )
+      where(filterField, '==', userId)
+    );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const conversations = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        // Format timestamp for UI
-        lastTime: doc.data().lastTimestamp?.toDate() 
-          ? doc.data().lastTimestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : 'Just now'
-      }))
-      set({ conversations, isLoading: false })
-    }, (error) => {
-      console.error('Conversations subscription error:', error)
-      set({ error: error.message })
-    })
+      const convs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          proName: data.professionalName || data.proName,
+          proSpecialty: data.professionalSpecialty || data.proSpecialty,
+          patientName: data.patientAlias || data.patientName,
+          lastTime: data.lastTimestamp?.toDate ? data.lastTimestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'
+        };
+      })
+      .sort((a, b) => {
+        const timeA = a.lastTimestamp?.toMillis ? a.lastTimestamp.toMillis() : 0;
+        const timeB = b.lastTimestamp?.toMillis ? b.lastTimestamp.toMillis() : 0;
+        return timeB - timeA; // Sort by most recent first
+      });
 
-    set({ _convUnsubscribe: unsubscribe })
+      console.log(`[ChatStore] Fetched and sorted ${convs.length} conversations`);
+      set({ conversations: convs, isLoading: false });
+    }, (error) => {
+      console.error("[ChatStore] Conv subscription error:", error);
+      set({ isLoading: false, error: error.message });
+    });
+
+    set({ _convUnsubscribe: unsubscribe });
   },
 
   setActiveConv: (convId) => {
-    const { _msgUnsubscribe, activeConvId } = get()
-    
-    if (activeConvId === convId) return
-    
-    // Cleanup existing message subscription
-    if (_msgUnsubscribe) _msgUnsubscribe()
+    const { _msgUnsubscribe } = get();
+    if (_msgUnsubscribe) _msgUnsubscribe();
 
-    set({ activeConvId: convId, activeMessages: [], isLoading: true })
+    set({ activeConvId: convId, activeMessages: [] });
 
+    if (!convId) return;
+
+    console.log(`[ChatStore] Subscribing to messages for: ${convId}`);
     const q = query(
       collection(db, 'conversations', convId, 'messages'),
       orderBy('timestamp', 'asc')
-    )
+    );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({
+      const msgs = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        time: doc.data().timestamp?.toDate() 
-          ? doc.data().timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : 'Just now'
-      }))
-      
-      // Decrypt messages if they have ciphertext
-      const { user } = get() // We need the current user's secret key
-      const activeConv = get().conversations.find(c => c.id === convId)
-      
-      const decryptedMessages = messages.map(m => {
-        if (m.ciphertext && m.nonce) {
-          try {
-            // Determine keys based on role
-            const isMe = m.senderId === user?.uid
-            const secretKey = localStorage.getItem(`SHARE_SECRET_${user?.uid}`)
-            
-            // If it's my message, I don't need to decrypt it if I stored the plain text locally?
-            // Actually, for E2E, I decrypt it using the sender's public key and my secret key.
-            const otherPublicKey = m.senderId === activeConv.patientUid ? activeConv.patientPublicKey : activeConv.proPublicKey
-            
-            // In tweetnacl box, if I am the receiver, I use my secret key and sender's public key.
-            // If I am the sender, I can't decrypt it with my own secret key unless I am also the receiver?
-            // Usually, you encrypt for the receiver. To see your own sent messages, you'd need to store them or encrypt for yourself too.
-            // For this demo, let's assume we store the plaintext 'text' for the sender or decrypt it correctly.
-            if (m.text) return m // Already has plaintext for UI
-            
-            const decrypted = decryptMessage(m.ciphertext, m.nonce, otherPublicKey, secretKey)
-            return { ...m, text: decrypted }
-          } catch (e) {
-            console.error('Decryption failed for message', m.id, e)
-            return { ...m, text: '[Encrypted Message]' }
-          }
-        }
-        return m
-      })
-
-      set({ activeMessages: decryptedMessages, isLoading: false })
-      
-      // Mark as read in Firestore (simplified: clear unread for current user)
-      // This would involve updating the conversation's unreadCount map
+        ...doc.data()
+      }));
+      set({ activeMessages: msgs });
     }, (error) => {
-      console.error('Messages subscription error:', error)
-      set({ error: error.message, isLoading: false })
-    })
+      console.error("[ChatStore] Msg subscription error:", error);
+    });
 
-    set({ _msgUnsubscribe: unsubscribe })
+    set({ _msgUnsubscribe: unsubscribe });
   },
 
   sendMessage: async (text) => {
-    const { activeConvId, conversations } = get()
-    if (!activeConvId) return
+    const { activeConvId, conversations } = get();
+    const { user } = useAuthStore.getState();
+    if (!activeConvId || !user) return;
 
-    const activeConv = conversations.find(c => c.id === activeConvId)
-    const { user } = useAuthStore.getState()
-    if (!user) return
-
-    const secretKey = localStorage.getItem(`SHARE_SECRET_${user.uid}`)
-    const recipientPublicKey = user.uid === activeConv.patientUid ? activeConv.proPublicKey : activeConv.patientPublicKey
+    const activeConv = conversations.find(c => c.id === activeConvId);
+    if (!activeConv) return;
 
     try {
-      const encrypted = encryptMessage(text, recipientPublicKey, secretKey)
+      const batch = writeBatch(db);
       
-      const msgData = {
+      // 1. Add message (using 'text' as requested)
+      const msgRef = doc(collection(db, 'conversations', activeConvId, 'messages'));
+      batch.set(msgRef, {
+        text,
         senderId: user.uid,
-        ciphertext: encrypted.ciphertext,
-        nonce: encrypted.nonce,
-        text: text, // Storing plaintext for the sender's own view (simplified)
-        timestamp: serverTimestamp(),
-      }
+        timestamp: serverTimestamp()
+      });
 
-      await addDoc(collection(db, 'conversations', activeConvId, 'messages'), msgData)
-      
-      await updateDoc(doc(db, 'conversations', activeConvId), {
+      // 2. Update conversation metadata
+      const convRef = doc(db, 'conversations', activeConvId);
+      batch.update(convRef, {
         lastMessage: text,
         lastTimestamp: serverTimestamp(),
-        [`unreadCount.${recipientPublicKey === activeConv.proPublicKey ? activeConv.proUid : activeConv.patientUid}`]: increment(1)
-      })
-    } catch (e) {
-      console.error('Send message error:', e)
-      set({ error: e.message })
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error("[ChatStore] Send message error:", error);
+    }
+  },
+
+  ensureConversation: async (pro) => {
+    const { user } = useAuthStore.getState();
+    if (!user || !pro) return null;
+
+    const patientUid = user.uid;
+    const proUid = pro.id || pro.uid;
+    
+    // Deterministic ID to avoid duplicates
+    const convId = [patientUid, proUid].sort().join('_');
+    const convRef = doc(db, 'conversations', convId);
+
+    try {
+      // Use query instead of getDoc to avoid Permission Denied on non-existent documents 
+      // when rules are strict about resource.data ownership
+      const q = query(
+        collection(db, 'conversations'), 
+        where('patientUid', '==', patientUid), 
+        where('proUid', '==', proUid)
+      );
+      const snap = await getDocs(q);
+      
+      if (snap.empty) {
+        console.log('[ChatStore] Creating new conversation:', convId);
+        await setDoc(convRef, {
+          patientUid,
+          proUid,
+          patientAlias: user.alias || user.name || 'Anonymous',
+          professionalName: pro.name || 'Professional',
+          professionalSpecialty: pro.specialties?.join(', ') || pro.title || 'Specialist',
+          lastMessage: 'Secure connection established.',
+          lastTimestamp: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+      
+      return convId;
+    } catch (error) {
+      console.error("[ChatStore] Error ensuring conversation:", error);
+      // Fallback for strict rules: attempt setDoc directly if it's a permission error on read
+      if (error.code === 'permission-denied') {
+        try {
+          await setDoc(convRef, {
+            patientUid,
+            proUid,
+            patientAlias: user.alias || user.name || 'Anonymous',
+            professionalName: pro.name || 'Professional',
+            professionalSpecialty: pro.specialties?.join(', ') || pro.title || 'Specialist',
+            lastMessage: 'Secure connection established.',
+            lastTimestamp: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          return convId;
+        } catch (e) {
+          console.error("[ChatStore] Final creation attempt failed:", e);
+        }
+      }
+      return null;
     }
   },
 
   getActiveConv: () => {
-    const { conversations, activeConvId } = get()
-    return conversations.find((c) => c.id === activeConvId)
+    const { conversations, activeConvId } = get();
+    return conversations.find(c => c.id === activeConvId);
   },
 
   cleanup: () => {
-    const { _convUnsubscribe, _msgUnsubscribe } = get()
-    if (_convUnsubscribe) _convUnsubscribe()
-    if (_msgUnsubscribe) _msgUnsubscribe()
-    set({ _convUnsubscribe: null, _msgUnsubscribe: null })
+    const { _convUnsubscribe, _msgUnsubscribe } = get();
+    if (_convUnsubscribe) _convUnsubscribe();
+    if (_msgUnsubscribe) _msgUnsubscribe();
+    set({ 
+      activeConvId: null, 
+      activeMessages: [], 
+      conversations: [], 
+      error: null, 
+      isLoading: false 
+    });
   }
 }))
