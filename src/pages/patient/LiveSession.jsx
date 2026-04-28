@@ -25,7 +25,7 @@ export default function LiveSession() {
     script.onload = () => {
       if (!jitsiContainerRef.current) return;
       
-      const domain = 'meet.ffmuc.net';
+      const domain = 'meet.jit.si';
       const isPro = role === 'professional';
       
       const options = {

@@ -37,6 +37,34 @@ src/
 └── stores/            # Zustand stores (Auth, Chat, Booking, Mood)
 ```
 
+## 🛠 Getting Started
+
+### 1. Installation
+```bash
+npm install
+```
+
+### 2. Environment Setup
+Create a `.env` file in the root directory and add your Firebase credentials (use `.env.example` as a template):
+```bash
+cp .env.example .env
+```
+
+### 3. Local Development
+```bash
+npm run dev
+```
+
+### 4. Deployment (Firebase Hosting)
+First, build the production bundle:
+```bash
+npm run build
+```
+Then, deploy to Firebase:
+```bash
+firebase deploy
+```
+
 ## ⚠️ Demo Mode Notice
 
 This application is currently in a high-fidelity **Demo Mode**. 

@@ -53,9 +53,10 @@ export const useChatStore = create((set, get) => ({
         return {
           id: doc.id,
           ...data,
-          proName: data.professionalName || data.proName,
-          proSpecialty: data.professionalSpecialty || data.proSpecialty,
-          patientName: data.patientAlias || data.patientName,
+          // Canonical field mapping for UI consistency
+          proName: data.professionalName,
+          proSpecialty: data.professionalSpecialty,
+          patientName: data.patientAlias,
           lastTime: data.lastTimestamp?.toDate ? data.lastTimestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'
         };
       })
@@ -162,8 +163,8 @@ export const useChatStore = create((set, get) => ({
           patientUid,
           proUid,
           patientAlias: user.alias || user.name || 'Anonymous',
-          professionalName: pro.name || 'Professional',
-          professionalSpecialty: pro.specialties?.join(', ') || pro.title || 'Specialist',
+          professionalName: pro.name || pro.professionalName || 'Professional',
+          professionalSpecialty: pro.specialties?.join(', ') || pro.title || pro.professionalSpecialty || 'Specialist',
           lastMessage: 'Secure connection established.',
           lastTimestamp: serverTimestamp(),
           createdAt: serverTimestamp(),
@@ -181,8 +182,8 @@ export const useChatStore = create((set, get) => ({
             patientUid,
             proUid,
             patientAlias: user.alias || user.name || 'Anonymous',
-            professionalName: pro.name || 'Professional',
-            professionalSpecialty: pro.specialties?.join(', ') || pro.title || 'Specialist',
+            professionalName: pro.name || pro.professionalName || 'Professional',
+            professionalSpecialty: pro.specialties?.join(', ') || pro.title || pro.professionalSpecialty || 'Specialist',
             lastMessage: 'Secure connection established.',
             lastTimestamp: serverTimestamp(),
             createdAt: serverTimestamp(),

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, X, CreditCard, CheckCircle } from 'lucide-react'
+import { Shield, X, CreditCard, CheckCircle, Calendar as CalendarIcon, Clock, ChevronRight, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Elements } from '@stripe/react-stripe-js'
 import { stripePromise } from '../../lib/stripe'
@@ -8,6 +8,7 @@ import { db } from '../../lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatStore } from '../../stores/chatStore'
+import { getAvailableSlots, resolveProId } from '../../utils/slotUtils'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 
@@ -16,9 +17,35 @@ function CheckoutForm({ pro, onClose }) {
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState(false)
   const [method, setMethod] = useState('card') // 'card' or 'bank'
+  const [availableDays, setAvailableDays] = useState([])
+  const [selectedSlot, setSelectedSlot] = useState(null)
+  const [loadingSlots, setLoadingSlots] = useState(true)
+  const [resolvedProId, setResolvedProId] = useState(null)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const uid = await resolveProId(pro);
+        setResolvedProId(uid);
+        const days = await getAvailableSlots(pro);
+        setAvailableDays(days);
+      } catch (err) {
+        console.error("Error loading slots:", err);
+      } finally {
+        setLoadingSlots(false);
+      }
+    }
+    loadData();
+  }, [pro]);
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    if (!selectedSlot) {
+      alert("Please select an available time slot first.");
+      return;
+    }
+
     setProcessing(true)
     
     try {
@@ -28,18 +55,17 @@ function CheckoutForm({ pro, onClose }) {
         throw new Error("You must be signed in to book a session.");
       }
 
-      const proId = pro.id || pro.uid || 'demo-pro'
       const specialty = Array.isArray(pro.specialties) ? pro.specialties.join(', ') : (pro.specialties || pro.title || 'Specialist')
 
       // 1. Create the booking object with exact requested fields
       const bookingData = {
         patientId: user.uid,
         patientAlias: user.alias || user.name || 'Anonymous',
-        professionalId: proId,
+        professionalId: resolvedProId || proId,
         proName: pro.name || 'Specialist',
         proSpecialty: specialty,
-        startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Default to tomorrow for demo
-        duration: 50,
+        startsAt: selectedSlot.startsAt.toISOString(),
+        duration: selectedSlot.duration || 50,
         status: 'upcoming',
         type: 'Video',
         amount: pro.pricePerSession || 3000,
@@ -98,15 +124,67 @@ function CheckoutForm({ pro, onClose }) {
         </div>
       </div>
 
+      {/* Slot Selection */}
+      <div className="space-y-4">
+        <h4 className="text-[14px] font-bold text-neutral-900 uppercase tracking-wide flex items-center gap-2">
+          <CalendarIcon size={16} className="text-primary" />
+          Select Appointment Time
+        </h4>
+
+        {loadingSlots ? (
+          <div className="py-8 flex flex-col items-center gap-3 bg-surface-tinted rounded-[24px] border border-dashed border-neutral-200">
+            <div className="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
+            <p className="text-neutral-400 font-medium text-xs">Finding available slots...</p>
+          </div>
+        ) : availableDays.length === 0 ? (
+          <div className="py-8 px-6 text-center bg-surface-tinted rounded-[24px] border border-dashed border-neutral-200">
+            <AlertCircle size={24} className="text-neutral-300 mx-auto mb-2" />
+            <p className="text-neutral-500 font-medium text-sm">No available slots this week</p>
+            <p className="text-neutral-400 text-xs mt-1">Please check back later or contact support.</p>
+          </div>
+        ) : (
+          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+            {availableDays.map((day) => (
+              <div key={day.date.toISOString()} className="space-y-2">
+                <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest px-1">
+                  {day.date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {day.slots.map((slot) => {
+                    const isSelected = selectedSlot?.startsAt.getTime() === slot.startsAt.getTime();
+                    return (
+                      <button
+                        key={slot.startsAt.toISOString()}
+                        type="button"
+                        onClick={() => setSelectedSlot(slot)}
+                        className={`py-2.5 px-3 rounded-xl text-[13px] font-bold transition-all border ${
+                          isSelected 
+                            ? 'bg-primary text-white border-primary shadow-md' 
+                            : 'bg-white text-neutral-700 border-neutral-200 hover:border-primary-light hover:bg-primary-light/10'
+                        }`}
+                      >
+                        {slot.startsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Method Selection */}
       <div className="flex p-1 bg-surface-tinted rounded-2xl">
         <button
+          type="button"
           onClick={() => setMethod('card')}
           className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all ${method === 'card' ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}
         >
           Credit/Debit Card
         </button>
         <button
+          type="button"
           onClick={() => setMethod('bank')}
           className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all ${method === 'bank' ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}
         >

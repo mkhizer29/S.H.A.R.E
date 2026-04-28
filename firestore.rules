@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function self(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isParticipant(data) {
+      return signedIn() && request.auth.uid in data.participants;
+    }
+
+    match /users/{userId} {
+      allow create: if self(userId)
+                    && request.auth.uid == userId
+                    && request.resource.data.keys().hasOnly([
+                      'email',
+                      'alias',
+                      'role',
+                      'publicKey',
+                      'createdAt'
+                    ])
+                    && request.resource.data.email is string
+                    && request.resource.data.alias is string
+                    && request.resource.data.role is string
+                    && request.resource.data.role in ['patient', 'professional', 'admin']
+                    && request.resource.data.publicKey is string
+                    && request.resource.data.createdAt is string;
+
+      allow read: if signedIn();
+      allow update: if self(userId);
+      allow delete: if false;
+    }
+
+    match /bookings/{bookingId} {
+  allow create: if request.auth != null;
+  allow read: if request.auth != null &&
+    (resource.data.patientId == request.auth.uid ||
+     resource.data.professionalId == request.auth.uid);
+  allow update: if request.auth != null &&
+    (resource.data.patientId == request.auth.uid ||
+     resource.data.professionalId == request.auth.uid);
+  allow delete: if false;
+}
+    
+    match /professionals/{professionalId} {
+  		allow read: if true;
+  		allow create: if request.auth != null;
+  		allow update: if request.auth != null;
+  		allow delete: if false;
+		}
+
+    match /moods/{moodId} {
+      allow create: if signedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow read, update: if signedIn()
+                          && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /conversations/{conversationId} {
+  allow create: if request.auth != null
+                && request.resource.data.patientUid is string
+                && request.resource.data.proUid is string
+                && (
+                  request.resource.data.patientUid == request.auth.uid ||
+                  request.resource.data.proUid == request.auth.uid
+                );
+
+  allow read, update: if request.auth != null &&
+    (
+      resource.data.patientUid == request.auth.uid ||
+      resource.data.proUid == request.auth.uid
+    );
+
+  allow delete: if false;
+
+  match /messages/{messageId} {
+    allow create: if request.auth != null
+                  && request.resource.data.senderId == request.auth.uid
+                  && (
+                    get(/databases/$(database)/documents/conversations/$(conversationId)).data.patientUid == request.auth.uid ||
+                    get(/databases/$(database)/documents/conversations/$(conversationId)).data.proUid == request.auth.uid
+                  );
+
+    allow read, update: if request.auth != null
+                        && (
+                          get(/databases/$(database)/documents/conversations/$(conversationId)).data.patientUid == request.auth.uid ||
+                          get(/databases/$(database)/documents/conversations/$(conversationId)).data.proUid == request.auth.uid
+                        );
+
+    allow delete: if false;
+  }
+}
+  }
+}

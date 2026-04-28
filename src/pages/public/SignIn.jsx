@@ -83,7 +83,7 @@ export default function SignIn() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 relative overflow-hidden">
+      <div className="flex-1 flex items-center justify-center px-6 py-12 relative">
         {/* Soft background glows for right side */}
         <div className="absolute top-10 right-10 w-96 h-96 bg-violet-200/20 rounded-full blur-[100px] pointer-events-none" />
         

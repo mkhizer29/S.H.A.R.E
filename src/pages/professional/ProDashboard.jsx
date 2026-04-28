@@ -25,10 +25,60 @@ const ProDashboard = () => {
     }
   }, [user?.uid, loadBookings, fetchConversations])
 
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  // Active Clients: Unique patient IDs from bookings and conversations
+  const activeClients = new Set([
+    ...sessions.filter(s => s.patientId).map(s => s.patientId),
+    ...conversations.filter(c => c.patientUid).map(c => c.patientUid)
+  ]).size;
+
+  // Sessions This Week: Bookings from the start of the current week (Sunday)
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  const sessionsThisWeek = sessions.filter(s => {
+    const d = new Date(s.startsAt);
+    return d >= startOfWeek && s.status === 'upcoming';
+  }).length;
+
+  const sessionsToday = sessions.filter(s => {
+    const d = new Date(s.startsAt);
+    return d.toDateString() === now.toDateString() && s.status === 'upcoming';
+  }).length;
+
+  // Earnings MTD: Sum of amounts for non-cancelled sessions this month
+  const earningsMTD = sessions
+    .filter(s => {
+      const d = new Date(s.startsAt);
+      return d.getMonth() === currentMonth && 
+             d.getFullYear() === currentYear && 
+             s.status !== 'cancelled';
+    })
+    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+
   const stats = [
-    { label: 'Active Clients', value: '12', icon: Users, trend: '+2 this month' },
-    { label: 'Sessions This Week', value: '18', icon: CalendarIcon, trend: '4 today' },
-    { label: 'Earnings MTD', value: 'PKR 2,450', icon: Banknote, trend: '+15% vs last month' },
+    { 
+      label: 'Active Clients', 
+      value: activeClients.toString(), 
+      icon: Users, 
+      trend: activeClients > 0 ? 'Practice growing' : 'Awaiting first client' 
+    },
+    { 
+      label: 'Sessions This Week', 
+      value: sessionsThisWeek.toString(), 
+      icon: CalendarIcon, 
+      trend: `${sessionsToday} today` 
+    },
+    { 
+      label: 'Earnings MTD', 
+      value: `PKR ${earningsMTD.toLocaleString()}`, 
+      icon: Banknote, 
+      trend: earningsMTD > 0 ? 'Revenue tracked' : 'Monthly overview' 
+    },
   ];
 
   const upcomingSessions = sessions

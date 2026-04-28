@@ -51,7 +51,9 @@ const Inbox = () => {
 
   const startSession = () => {
     if (activeConv) {
-      navigate(`/pro/session/${activeConv.patientName}`);
+      // Use the canonical patientUid from the conversation doc
+      const patientUid = activeConv.patientUid
+      navigate(`/pro/session/${patientUid}`)
     }
   };
 
@@ -87,39 +89,31 @@ const Inbox = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {conversations.map((conv) => {
-            const unreadCount = conv.unreadCount?.[user?.uid] || 0;
-            return (
-              <div
-                key={conv.id}
-                onClick={() => setActiveConv(conv.id)}
-                className={`p-4 rounded-2xl cursor-pointer flex gap-4 transition-all ${activeConvId === conv.id
-                  ? 'bg-primary-light shadow-inner-soft'
-                  : 'hover:bg-neutral-100'
-                  }`}
-              >
-                <Avatar name={conv.patientName || 'Patient'} size="md" online={activeConvId === conv.id} />
-                <div className="flex-1 min-w-0 pt-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <h4 className={`text-[15px] font-bold truncate ${activeConvId === conv.id ? 'text-primary' : 'text-neutral-900'}`}>
-                      {conv.patientName || 'Anonymous'}
-                    </h4>
-                    <span className={`text-[11px] font-semibold ${unreadCount > 0 ? 'text-alert' : 'text-neutral-400'}`}>
-                      {conv.lastTime}
-                    </span>
-                  </div>
-                  <p className={`text-[13px] truncate ${unreadCount > 0 ? 'text-neutral-900 font-bold' : 'text-neutral-500 font-medium'}`}>
-                    {conv.lastMessage}
-                  </p>
+          {conversations.map((conv) => (
+            <div
+              key={conv.id}
+              onClick={() => setActiveConv(conv.id)}
+              className={`p-4 rounded-2xl cursor-pointer flex gap-4 transition-all ${activeConvId === conv.id
+                ? 'bg-primary-light shadow-inner-soft'
+                : 'hover:bg-neutral-100'
+                }`}
+            >
+              <Avatar name={conv.patientName || 'Patient'} size="md" online={activeConvId === conv.id} />
+              <div className="flex-1 min-w-0 pt-1">
+                <div className="flex justify-between items-center mb-1">
+                  <h4 className={`text-[15px] font-bold truncate ${activeConvId === conv.id ? 'text-primary' : 'text-neutral-900'}`}>
+                    {conv.patientName || 'Anonymous'}
+                  </h4>
+                  <span className="text-[11px] font-semibold text-neutral-400">
+                    {conv.lastTime}
+                  </span>
                 </div>
-                {unreadCount > 0 && (
-                  <div className="w-5 h-5 rounded-full bg-alert text-white flex items-center justify-center text-[11px] font-bold self-center shadow-sm -ml-2">
-                    {unreadCount}
-                  </div>
-                )}
+                <p className="text-[13px] truncate text-neutral-500 font-medium">
+                  {conv.lastMessage}
+                </p>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
 

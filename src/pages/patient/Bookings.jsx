@@ -41,21 +41,19 @@ export default function Bookings() {
     if (isConnecting) return
     setIsConnecting(true)
     
-    console.log('[Bookings] Messaging pro:', s.proName, s.professionalId)
+    console.log('[Bookings] Connecting to pro:', s.proName, s.professionalId)
     try {
       const convId = await ensureConversation({
-        id: s.professionalId,
+        uid: s.professionalId,
         name: s.proName,
         title: s.proSpecialty
       })
-      
-      console.log('[Bookings] ensureConversation returned:', convId)
       
       if (convId) {
         setActiveConv(convId)
         navigate('/patient/chat')
       } else {
-        alert("Could not establish a secure connection. Please check your internet or try again later.")
+        console.error('[Bookings] Failed to get convId')
       }
     } catch (e) {
       console.error('[Bookings] Error in handleMessage:', e)

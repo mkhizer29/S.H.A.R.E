@@ -31,7 +31,7 @@ export default function SignUp() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F7FA] font-sans flex items-center justify-center px-6 py-16 relative overflow-hidden">
+    <div className="min-h-screen bg-[#F8F7FA] font-sans flex items-center justify-center px-6 py-16 relative">
       {/* Background ambient light */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-violet-200/30 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-[0%] left-[-10%] w-[400px] h-[400px] bg-sage-200/20 rounded-full blur-[100px] pointer-events-none" />

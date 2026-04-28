@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Lock, MoreVertical, Phone, MessageSquare, Sparkles } from 'lucide-react'
+import { Send, Lock, MoreVertical, Phone, MessageSquare, Sparkles, AlertCircle } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
+import { useBookingStore } from '../../stores/bookingStore'
 import { useNavigate } from 'react-router-dom'
 import ChatBubble from '../../components/ChatBubble'
 import Avatar from '../../components/ui/Avatar'
@@ -22,8 +23,10 @@ export default function Chat() {
     isTyping, 
     getActiveConv 
   } = useChatStore()
+  const { sessions, loadBookings, getNextBookingForPair } = useBookingStore()
   
   const [input, setInput] = useState('')
+  const [sessionError, setSessionError] = useState(null)
   const messagesEndRef = useRef(null)
   const activeConv = getActiveConv()
   const navigate = useNavigate()
@@ -31,13 +34,19 @@ export default function Chat() {
   useEffect(() => {
     if (user?.uid) {
       fetchConversations(user.uid, 'patient')
+      loadBookings(user.uid, 'patient')
     }
     return () => cleanup()
-  }, [user?.uid, fetchConversations, cleanup])
+  }, [user?.uid, fetchConversations, loadBookings, cleanup])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [activeMessages, isTyping])
+
+  // Clear session error when switching conversations
+  useEffect(() => {
+    setSessionError(null)
+  }, [activeConvId])
 
   const handleSend = () => {
     if (!input.trim()) return
@@ -52,9 +61,16 @@ export default function Chat() {
     }
   }
 
-  const startSession = (withVideo = false) => {
-    if (activeConv) {
-      navigate(`/patient/session/${activeConv.proId}?video=${withVideo}`)
+  const startSession = () => {
+    if (!activeConv) return
+    setSessionError(null)
+
+    // Find the next upcoming booking for this patient-professional pair
+    const booking = getNextBookingForPair(user.uid, activeConv.proUid)
+    if (booking) {
+      navigate(`/patient/session/${booking.id}`)
+    } else {
+      setSessionError('No upcoming session booked with this professional. Please book a session first.')
     }
   }
 
@@ -90,37 +106,29 @@ export default function Chat() {
         </div>
 
         <div className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
-          {conversations.map((conv) => {
-            const unreadCount = conv.unreadCount?.[user?.uid] || 0
-            return (
-              <motion.button
-                key={conv.id}
-                whileHover={{ scale: 0.99 }}
-                onClick={() => setActiveConv(conv.id)}
-                className={`w-full px-4 py-4 rounded-2xl flex items-start gap-4 text-left transition-all ${
-                  activeConvId === conv.id 
-                    ? 'bg-primary-light shadow-inner-soft' 
-                    : 'hover:bg-neutral-100'
-                }`}
-              >
-                <Avatar name={conv.proName} size="md" online={true} />
-                <div className="flex-1 min-w-0 pt-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className={`text-[15px] font-bold truncate ${activeConvId === conv.id ? 'text-primary' : 'text-neutral-900'}`}>
-                      {conv.proName}
-                    </p>
-                    <span className="text-[11px] font-semibold text-neutral-400 flex-shrink-0">{conv.lastTime}</span>
-                  </div>
-                  <p className="text-[13px] font-medium text-neutral-500 truncate">{conv.lastMessage}</p>
+          {conversations.map((conv) => (
+            <motion.button
+              key={conv.id}
+              whileHover={{ scale: 0.99 }}
+              onClick={() => setActiveConv(conv.id)}
+              className={`w-full px-4 py-4 rounded-2xl flex items-start gap-4 text-left transition-all ${
+                activeConvId === conv.id 
+                  ? 'bg-primary-light shadow-inner-soft' 
+                  : 'hover:bg-neutral-100'
+              }`}
+            >
+              <Avatar name={conv.proName} size="md" online={true} />
+              <div className="flex-1 min-w-0 pt-1">
+                <div className="flex items-center justify-between mb-1">
+                  <p className={`text-[15px] font-bold truncate ${activeConvId === conv.id ? 'text-primary' : 'text-neutral-900'}`}>
+                    {conv.proName}
+                  </p>
+                  <span className="text-[11px] font-semibold text-neutral-400 flex-shrink-0">{conv.lastTime}</span>
                 </div>
-                {unreadCount > 0 && (
-                  <span className="w-5 h-5 bg-alert rounded-full text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
-                    {unreadCount}
-                  </span>
-                )}
-              </motion.button>
-            )
-          })}
+                <p className="text-[13px] font-medium text-neutral-500 truncate">{conv.lastMessage}</p>
+              </div>
+            </motion.button>
+          ))}
         </div>
       </div>
 

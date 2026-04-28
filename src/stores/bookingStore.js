@@ -73,4 +73,16 @@ export const useBookingStore = create((set, get) => ({
   getPast: () => get().sessions
     .filter((s) => s.status !== 'upcoming')
     .sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt)),
+
+  /** Find the next upcoming booking between a specific patient and professional */
+  getNextBookingForPair: (patientId, professionalId) => {
+    if (!patientId || !professionalId) return null;
+    return get().sessions
+      .filter(s =>
+        s.status === 'upcoming' &&
+        s.patientId === patientId &&
+        s.professionalId === professionalId
+      )
+      .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0] || null;
+  },
 }))

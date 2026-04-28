@@ -87,32 +87,6 @@ export default function Settings() {
           <h2 className="font-display text-lg text-text-primary">Your Data</h2>
         </div>
         <Card hover={false} className="divide-y divide-border-subtle">
-          <button className="w-full flex items-center justify-between p-4 hover:bg-sage-light/40 transition-all group">
-            <div className="flex items-center gap-3">
-              <Download size={15} className="text-text-secondary" />
-              <div className="text-left">
-                <p className="text-sm font-medium text-text-primary flex items-center gap-2">
-                  Export My Data
-                  <span className="text-[10px] bg-neutral-100 text-neutral-400 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Coming Soon</span>
-                </p>
-                <p className="text-xs text-text-muted">Download encrypted archive of your sessions and messages</p>
-              </div>
-            </div>
-            <ChevronRight size={15} className="text-text-muted group-hover:translate-x-1 transition-transform" />
-          </button>
-          <button className="w-full flex items-center justify-between p-4 hover:bg-sage-light/40 transition-all group">
-            <div className="flex items-center gap-3">
-              <Eye size={15} className="text-text-secondary" />
-              <div className="text-left">
-                <p className="text-sm font-medium text-text-primary flex items-center gap-2">
-                  Delete Chat History
-                  <span className="text-[10px] bg-neutral-100 text-neutral-400 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Coming Soon</span>
-                </p>
-                <p className="text-xs text-text-muted">Permanently remove all messages from our servers</p>
-              </div>
-            </div>
-            <ChevronRight size={15} className="text-text-muted group-hover:translate-x-1 transition-transform" />
-          </button>
           <button
             onClick={() => setShowDeleteModal(true)}
             className="w-full flex items-center justify-between p-4 hover:bg-alert-coral-light transition-all"
@@ -130,15 +104,26 @@ export default function Settings() {
       </motion.div>
 
       {/* Delete account modal */}
-      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Account?">
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Account Request">
         <div className="text-center">
           <div className="w-14 h-14 bg-alert-coral-light rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Trash2 size={22} className="text-alert-coral" />
           </div>
-          <p className="text-text-secondary text-sm mb-4">This action is <strong>permanent and irreversible</strong>. All your messages, sessions, and data will be permanently deleted within 24 hours.</p>
-          <div className="flex gap-3">
-            <Button variant="danger" onClick={() => setShowDeleteModal(false)} className="flex-1">Delete Everything</Button>
-            <Button variant="secondary" onClick={() => setShowDeleteModal(false)} className="flex-1">Keep Account</Button>
+          <p className="text-text-secondary text-sm mb-4">
+            Automated account deletion is currently disabled for security. To permanently delete your account and all associated data, please contact our support team.
+          </p>
+          <div className="flex gap-3 mt-6">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                window.location.href = 'mailto:support@share.platform?subject=Account Deletion Request';
+                setShowDeleteModal(false);
+              }} 
+              className="flex-1"
+            >
+              Contact Support
+            </Button>
+            <Button variant="primary" onClick={() => setShowDeleteModal(false)} className="flex-1">Cancel</Button>
           </div>
         </div>
       </Modal>
