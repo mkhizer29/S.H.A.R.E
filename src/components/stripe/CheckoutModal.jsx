@@ -20,17 +20,25 @@ function CheckoutForm({ pro, onClose }) {
   const [availableDays, setAvailableDays] = useState([])
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [loadingSlots, setLoadingSlots] = useState(true)
+  const [slotError, setSlotError] = useState(null)
   const [resolvedProId, setResolvedProId] = useState(null)
 
   useEffect(() => {
     async function loadData() {
+      setLoadingSlots(true);
+      setSlotError(null);
       try {
         const uid = await resolveProId(pro);
         setResolvedProId(uid);
-        const days = await getAvailableSlots(pro);
-        setAvailableDays(days);
+        if (uid) {
+          const days = await getAvailableSlots(pro);
+          setAvailableDays(days);
+        } else {
+          setSlotError("Could not identify this professional. Please try another.");
+        }
       } catch (err) {
         console.error("Error loading slots:", err);
+        setSlotError("Failed to load availability. Please try refreshing or contact support.");
       } finally {
         setLoadingSlots(false);
       }
@@ -55,13 +63,30 @@ function CheckoutForm({ pro, onClose }) {
         throw new Error("You must be signed in to book a session.");
       }
 
+      // Re-resolve ID to be absolutely sure we have the canonical UID
+      const canonicalProId = resolvedProId || (await resolveProId(pro));
+      if (!canonicalProId) {
+        throw new Error("Could not resolve professional identity. Please try again.");
+      }
+
+      // 0. Double-check if the slot is STILL available in Firestore
+      console.log('[Checkout] Re-checking slot availability for:', canonicalProId);
+      const currentSlots = await getAvailableSlots(pro);
+      const isStillAvailable = currentSlots.some(day => 
+        day.slots.some(slot => slot.startsAt.getTime() === selectedSlot.startsAt.getTime())
+      );
+
+      if (!isStillAvailable) {
+        throw new Error("This time slot was just booked by someone else. Please select another time.");
+      }
+
       const specialty = Array.isArray(pro.specialties) ? pro.specialties.join(', ') : (pro.specialties || pro.title || 'Specialist')
 
-      // 1. Create the booking object with exact requested fields
+      // 1. Create the booking object with canonical UID
       const bookingData = {
         patientId: user.uid,
         patientAlias: user.alias || user.name || 'Anonymous',
-        professionalId: resolvedProId || proId,
+        professionalId: canonicalProId,
         proName: pro.name || 'Specialist',
         proSpecialty: specialty,
         startsAt: selectedSlot.startsAt.toISOString(),
@@ -136,6 +161,12 @@ function CheckoutForm({ pro, onClose }) {
             <div className="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
             <p className="text-neutral-400 font-medium text-xs">Finding available slots...</p>
           </div>
+        ) : slotError ? (
+          <div className="py-8 px-6 text-center bg-red-50 rounded-[24px] border border-dashed border-red-200">
+            <AlertCircle size={24} className="text-red-400 mx-auto mb-2" />
+            <p className="text-red-600 font-bold text-sm">Loading Error</p>
+            <p className="text-red-500 text-xs mt-1">{slotError}</p>
+          </div>
         ) : availableDays.length === 0 ? (
           <div className="py-8 px-6 text-center bg-surface-tinted rounded-[24px] border border-dashed border-neutral-200">
             <AlertCircle size={24} className="text-neutral-300 mx-auto mb-2" />
@@ -152,18 +183,24 @@ function CheckoutForm({ pro, onClose }) {
                 <div className="grid grid-cols-3 gap-2">
                   {day.slots.map((slot) => {
                     const isSelected = selectedSlot?.startsAt.getTime() === slot.startsAt.getTime();
+                    const isBooked = slot.isBooked;
+
                     return (
                       <button
                         key={slot.startsAt.toISOString()}
                         type="button"
-                        onClick={() => setSelectedSlot(slot)}
-                        className={`py-2.5 px-3 rounded-xl text-[13px] font-bold transition-all border ${
-                          isSelected 
-                            ? 'bg-primary text-white border-primary shadow-md' 
-                            : 'bg-white text-neutral-700 border-neutral-200 hover:border-primary-light hover:bg-primary-light/10'
-                        }`}
+                        onClick={() => !isBooked && setSelectedSlot(slot)}
+                        disabled={isBooked}
+                        className={`py-3 px-2 rounded-2xl text-[13px] font-bold transition-all border
+                          ${isBooked
+                            ? 'bg-neutral-50 border-neutral-100 text-neutral-300 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-primary border-primary text-white shadow-float-primary'
+                              : 'bg-white border-neutral-200 text-neutral-700 hover:border-primary-light hover:bg-primary-light/5 hover:text-primary'
+                          }`}
                       >
                         {slot.startsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                        {isBooked && <span className="block text-[9px] mt-0.5 opacity-60">Booked</span>}
                       </button>
                     );
                   })}

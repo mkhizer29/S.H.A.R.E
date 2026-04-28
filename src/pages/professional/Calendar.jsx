@@ -263,18 +263,16 @@ const Calendar = () => {
                             return (
                               <div
                                 key={avail.id || aIdx}
-                                className="absolute left-1.5 right-1.5 rounded-2xl z-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden border border-primary/20 shadow-inner-soft"
+                                className="absolute left-1 right-1 rounded-2xl z-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden border border-dashed border-primary/20"
                                 style={{ 
                                   top: `${topRem}rem`, 
                                   height: `${Math.max(heightRem, 1)}rem`,
-                                  background: 'linear-gradient(135deg, rgba(139, 120, 230, 0.04) 0%, rgba(139, 120, 230, 0.12) 100%)'
+                                  background: 'rgba(139, 120, 230, 0.03)'
                                 }}
                               >
-                                {heightRem >= 1.5 && (
-                                  <div className="flex flex-col items-center opacity-60">
-                                    <Clock size={14} className="text-primary mb-1" />
-                                    <span className="text-[10px] font-bold text-primary tracking-widest uppercase mb-0.5">Available</span>
-                                    <span className="text-[10px] font-semibold text-primary/80">{timeString}</span>
+                                {heightRem >= 2 && (
+                                  <div className="flex flex-col items-center opacity-30">
+                                    <span className="text-[9px] font-bold text-primary/60 tracking-widest uppercase">{timeString}</span>
                                   </div>
                                 )}
                               </div>
