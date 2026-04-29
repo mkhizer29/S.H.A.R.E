@@ -1,6 +1,32 @@
 import { create } from 'zustand'
 import { db } from '../lib/firebase'
-import { collection, getDocs, getDoc, doc, updateDoc, setDoc, query, orderBy } from 'firebase/firestore'
+import {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  updateDoc,
+  setDoc,
+  query,
+  orderBy
+} from 'firebase/firestore'
+
+const normalizeProfessional = (docSnap) => {
+  const data = docSnap.data()
+  const canonicalUid =
+    data.uid ||
+    data.userId ||
+    data.professionalId ||
+    (typeof docSnap.id === 'string' && docSnap.id.length >= 20 ? docSnap.id : null)
+
+  return {
+    id: docSnap.id,
+    ...data,
+    uid: canonicalUid || data.uid || data.userId || data.professionalId || null,
+    userId: canonicalUid || data.userId || data.uid || data.professionalId || null,
+    professionalId: canonicalUid || data.professionalId || data.uid || data.userId || null
+  }
+}
 
 export const useProStore = create((set) => ({
   professionals: [],
@@ -9,10 +35,12 @@ export const useProStore = create((set) => ({
 
   fetchProfessionals: async () => {
     set({ isLoading: true, error: null })
+
     try {
       const q = query(collection(db, 'professionals'), orderBy('rating', 'desc'))
       const snapshot = await getDocs(q)
-      const pros = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const pros = snapshot.docs.map(normalizeProfessional)
+
       set({ professionals: pros, isLoading: false })
     } catch (error) {
       console.error('Error fetching professionals:', error)
@@ -23,9 +51,11 @@ export const useProStore = create((set) => ({
   fetchProById: async (id) => {
     try {
       const proDoc = await getDoc(doc(db, 'professionals', id))
+
       if (proDoc.exists()) {
-        return { id: proDoc.id, ...proDoc.data() }
+        return normalizeProfessional(proDoc)
       }
+
       return null
     } catch (error) {
       console.error('Error fetching pro by id:', error)
@@ -35,16 +65,34 @@ export const useProStore = create((set) => ({
 
   updateProProfile: async (id, updates) => {
     set({ isLoading: true, error: null })
+
     try {
       const proRef = doc(db, 'professionals', id)
       const proDoc = await getDoc(proRef)
-      
+
+      const canonicalUid =
+        updates.uid ||
+        updates.userId ||
+        updates.professionalId ||
+        (typeof id === 'string' && id.length >= 20 ? id : null)
+
+      const payload = {
+        ...updates,
+        ...(canonicalUid
+          ? {
+            uid: canonicalUid,
+            userId: canonicalUid,
+            professionalId: canonicalUid
+          }
+          : {}),
+        updatedAt: new Date().toISOString()
+      }
+
       if (proDoc.exists()) {
-        await updateDoc(proRef, updates)
+        await updateDoc(proRef, payload)
       } else {
-        // If profile doesn't exist yet, create it
         await setDoc(proRef, {
-          ...updates,
+          ...payload,
           createdAt: new Date().toISOString(),
           rating: 5.0,
           reviewCount: 0,
@@ -52,11 +100,19 @@ export const useProStore = create((set) => ({
           verified: false
         })
       }
-      
+
       set((state) => ({
-        professionals: state.professionals.map(p => p.id === id ? { ...p, ...updates } : p),
+        professionals: state.professionals.map((p) =>
+          p.id === id
+            ? {
+              ...p,
+              ...payload
+            }
+            : p
+        ),
         isLoading: false
       }))
+
       return true
     } catch (error) {
       console.error('Error updating pro profile:', error)

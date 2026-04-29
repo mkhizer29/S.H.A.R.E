@@ -1,483 +1,564 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Video, Phone, MessageSquare, Clock, Calendar as CalendarIcon, Settings2, Trash2 } from 'lucide-react';
-import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
-import Avatar from '../../components/ui/Avatar';
-import JoinSessionButton from '../../components/JoinSessionButton';
-import { useAuthStore } from '../../stores/authStore';
-import { useBookingStore } from '../../stores/bookingStore';
-import { useAvailabilityStore } from '../../stores/availabilityStore';
+import React, { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  MessageSquare,
+  Phone,
+  Settings2,
+  Trash2,
+  Video
+} from 'lucide-react'
+import { useAuthStore } from '../../stores/authStore'
+import { useBookingStore } from '../../stores/bookingStore'
+import { useAvailabilityStore } from '../../stores/availabilityStore'
 
-/* ─── Helpers ──────────────────────────────────────────────── */
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const GRID_START_HOUR = 8
+const GRID_END_HOUR = 19
+const HOUR_HEIGHT_REM = 5
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const HOUR_LABELS = ['8 AM', '9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'];
-const GRID_START_HOUR = 8;   // 8 AM
-const GRID_END_HOUR = 19;    // 7 PM (exclusive)
-const HOUR_HEIGHT_REM = 5;   // rem per hour slot
+const addDays = (date, amount) => {
+  const next = new Date(date)
+  next.setDate(next.getDate() + amount)
+  return next
+}
 
-/** Return the start of week (Sunday) for a given date */
 const startOfWeek = (date) => {
-  const d = new Date(date);
-  d.setDate(d.getDate() - d.getDay());
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+  const next = new Date(date)
+  next.setHours(0, 0, 0, 0)
+  next.setDate(next.getDate() - next.getDay())
+  return next
+}
 
-/** Add N days to a date */
-const addDays = (date, n) => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
-};
+const isSameDay = (a, b) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate()
 
-/** Check if two dates are the same calendar day */
-const isSameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const dateKey = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
-/** Format date as "Apr 28" */
-const shortDate = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const shortDate = (date) =>
+  date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric'
+  })
 
-/** Get session type icon */
+const toDate = (value) => {
+  if (!value) return null
+  if (value instanceof Date) return value
+  if (typeof value?.toDate === 'function') return value.toDate()
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const getSessionDuration = (session) => Number(session.duration || session.durationMinutes || 50)
+
 const getTypeIcon = (type) => {
-  const t = (type || '').toLowerCase();
-  if (t.includes('video')) return <Video size={13} strokeWidth={2.5} />;
-  if (t.includes('audio') || t.includes('phone') || t.includes('call')) return <Phone size={13} strokeWidth={2.5} />;
-  if (t.includes('chat') || t.includes('message')) return <MessageSquare size={13} strokeWidth={2.5} />;
-  return <Clock size={13} strokeWidth={2.5} />;
-};
+  const normalized = String(type || '').toLowerCase()
+  if (normalized.includes('video')) return <Video className="h-3.5 w-3.5" />
+  if (normalized.includes('audio') || normalized.includes('phone') || normalized.includes('call')) {
+    return <Phone className="h-3.5 w-3.5" />
+  }
+  return <MessageSquare className="h-3.5 w-3.5" />
+}
 
-/* ─── Component ────────────────────────────────────────────── */
+const buildAvailabilitySegments = (day, dayAvailabilities, daySessions) => {
+  const sessionRanges = daySessions
+    .filter((session) => session.status !== 'cancelled')
+    .map((session) => {
+      const start = toDate(session.startsAt)
+      if (!start) return null
+
+      const end = new Date(start.getTime() + getSessionDuration(session) * 60_000)
+
+      return {
+        start: start.getTime(),
+        end: end.getTime()
+      }
+    })
+    .filter(Boolean)
+
+  const freeSegments = []
+
+  dayAvailabilities.forEach((availability) => {
+    const [startHour, startMinute] = String(availability.startTime || '09:00')
+      .split(':')
+      .map(Number)
+    const [endHour, endMinute] = String(availability.endTime || '17:00')
+      .split(':')
+      .map(Number)
+
+    if (
+      Number.isNaN(startHour) ||
+      Number.isNaN(startMinute) ||
+      Number.isNaN(endHour) ||
+      Number.isNaN(endMinute)
+    ) {
+      return
+    }
+
+    const rangeStart = new Date(day)
+    rangeStart.setHours(startHour, startMinute, 0, 0)
+
+    const rangeEnd = new Date(day)
+    rangeEnd.setHours(endHour, endMinute, 0, 0)
+
+    let segments = [{ start: rangeStart.getTime(), end: rangeEnd.getTime() }]
+
+    sessionRanges.forEach((sessionRange) => {
+      const nextSegments = []
+
+      segments.forEach((segment) => {
+        if (sessionRange.end <= segment.start || sessionRange.start >= segment.end) {
+          nextSegments.push(segment)
+          return
+        }
+
+        if (sessionRange.start > segment.start) {
+          nextSegments.push({ start: segment.start, end: sessionRange.start })
+        }
+
+        if (sessionRange.end < segment.end) {
+          nextSegments.push({ start: sessionRange.end, end: segment.end })
+        }
+      })
+
+      segments = nextSegments
+    })
+
+    segments.forEach((segment) => {
+      if (segment.end > segment.start) {
+        freeSegments.push({
+          ...availability,
+          segmentStart: new Date(segment.start),
+          segmentEnd: new Date(segment.end)
+        })
+      }
+    })
+  })
+
+  return freeSegments
+}
+
+const hours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR }, (_, index) => GRID_START_HOUR + index)
 
 const Calendar = () => {
-  const { user } = useAuthStore();
-  const { sessions, loadBookings, isLoading } = useBookingStore();
-  const { availabilities, loadAvailability, addAvailability, deleteAvailability } = useAvailabilityStore();
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week
-  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const { user } = useAuthStore()
+  const { sessions, loadBookings, isLoading } = useBookingStore()
+  const {
+    availabilities,
+    loadAvailability,
+    addAvailability,
+    deleteAvailability,
+    isLoading: availabilityLoading
+  } = useAvailabilityStore()
+
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false)
 
   useEffect(() => {
-    if (user?.uid) {
-      loadBookings(user.uid, 'professional');
-      loadAvailability(user.uid);
-    }
-  }, [user?.uid, loadBookings, loadAvailability]);
+    if (!user?.uid) return
 
-  const now = new Date();
+    loadBookings(user.uid, 'professional')
+    loadAvailability(user.uid)
+  }, [user?.uid, loadBookings, loadAvailability])
 
-  /* ── Compute the 7 days of the current view week ── */
-  const weekStart = useMemo(() => addDays(startOfWeek(now), weekOffset * 7), [weekOffset]);
-  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const now = new Date()
+  const weekStart = useMemo(() => addDays(startOfWeek(now), weekOffset * 7), [weekOffset])
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
+    [weekStart]
+  )
 
-  /* ── Title for header ── */
   const headerTitle = useMemo(() => {
-    const first = weekDays[0];
-    const last = weekDays[6];
-    if (first.getMonth() === last.getMonth()) {
-      return `${first.toLocaleDateString(undefined, { month: 'long' })} ${first.getFullYear()}`;
-    }
-    return `${shortDate(first)} – ${shortDate(last)}, ${last.getFullYear()}`;
-  }, [weekDays]);
+    const first = weekDays[0]
+    const last = weekDays[6]
+    return `${shortDate(first)} – ${shortDate(last)}, ${last.getFullYear()}`
+  }, [weekDays])
 
-  /* ── Filter sessions that fall within this week ── */
+  const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart])
+
   const weekSessions = useMemo(() => {
-    const weekEnd = addDays(weekStart, 7);
-    return sessions.filter(s => {
-      if (!s.startsAt) return false;
-      const d = new Date(s.startsAt);
-      return d >= weekStart && d < weekEnd;
-    });
-  }, [sessions, weekStart]);
-
-  /* ── Group sessions by day index (0-6) ── */
-  const sessionsByDay = useMemo(() => {
-    const map = {};
-    weekSessions.forEach(s => {
-      const d = new Date(s.startsAt);
-      const dayIdx = d.getDay(); // 0=Sun
-      if (!map[dayIdx]) map[dayIdx] = [];
-      map[dayIdx].push(s);
-    });
-    return map;
-  }, [weekSessions]);
-
-  /* ── Today's sessions for the sidebar ── */
-  const todaySessions = useMemo(() => {
     return sessions
-      .filter(s => s.startsAt && isSameDay(new Date(s.startsAt), now) && s.status === 'upcoming')
-      .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
-  }, [sessions, now]);
+      .filter((session) => {
+        const start = toDate(session.startsAt)
+        return start && start >= weekStart && start < weekEnd
+      })
+      .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))
+  }, [sessions, weekStart, weekEnd])
 
-  /* ── Stats ── */
-  const upcomingCount = sessions.filter(s => s.status === 'upcoming').length;
-  const thisWeekCount = weekSessions.filter(s => s.status === 'upcoming').length;
+  const sessionsByDate = useMemo(() => {
+    const map = new Map()
+
+    weekSessions.forEach((session) => {
+      const start = toDate(session.startsAt)
+      if (!start) return
+
+      const key = dateKey(start)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(session)
+    })
+
+    return map
+  }, [weekSessions])
+
+  const todaySessions = useMemo(
+    () =>
+      sessions
+        .filter((session) => {
+          const start = toDate(session.startsAt)
+          return start && isSameDay(start, now) && session.status === 'upcoming'
+        })
+        .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)),
+    [sessions]
+  )
+
+  const upcomingCount = sessions.filter((session) => session.status === 'upcoming').length
+  const thisWeekCount = weekSessions.filter((session) => session.status === 'upcoming').length
+
+  const timezoneLabel = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* ─── Page Header ─── */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="flex justify-between items-end mb-2 px-1"
-      >
+    <>
+      <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Calendar</h1>
-          <p className="text-[15px] font-medium text-neutral-500 mt-2">
+          <h1 className="text-4xl font-bold text-neutral-900">Calendar</h1>
+          <p className="mt-2 text-sm text-neutral-500">
             {thisWeekCount} session{thisWeekCount !== 1 ? 's' : ''} this week · {todaySessions.length} today
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="primary" icon={<CalendarIcon size={13} />}>
-            {upcomingCount} upcoming
-          </Badge>
-        </div>
-      </motion.div>
 
-      <div className="grid lg:grid-cols-[1fr_340px] gap-6">
-        {/* ─── Main Weekly Grid ─── */}
+        <div className="rounded-full border border-primary-light bg-primary-light/40 px-4 py-2 text-sm font-bold text-primary">
+          <CalendarIcon className="mr-2 inline h-4 w-4" />
+          {upcomingCount} upcoming
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
+          className="rounded-[32px] border border-neutral-200 bg-white shadow-card"
         >
-          <div className="bg-surface rounded-[32px] border border-neutral-200 shadow-soft overflow-hidden">
-            {/* Calendar Header */}
-            <div className="p-6 md:p-8 border-b border-neutral-200 flex justify-between items-center bg-surface w-full">
-              <div className="flex items-center gap-5">
-                <h2 className="text-xl font-bold text-neutral-900 tracking-tight">{headerTitle}</h2>
-                {weekOffset !== 0 && (
-                  <button
-                    onClick={() => setWeekOffset(0)}
-                    className="text-[13px] font-bold text-primary bg-primary-light px-3 py-1 rounded-full hover:bg-primary-light/80 transition-colors"
-                  >
-                    Back to today
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setWeekOffset(o => o - 1)}
-                  className="w-10 h-10 flex items-center justify-center border border-neutral-200 rounded-xl text-neutral-500 hover:text-primary hover:border-primary-light hover:bg-primary-light transition-all"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <button
-                  onClick={() => setWeekOffset(0)}
-                  className="px-5 py-2 text-[14px] font-bold border border-neutral-200 rounded-xl text-neutral-700 hover:text-primary hover:border-primary-light hover:bg-primary-light transition-all"
-                >
-                  Today
-                </button>
-                <button
-                  onClick={() => setWeekOffset(o => o + 1)}
-                  className="w-10 h-10 flex items-center justify-center border border-neutral-200 rounded-xl text-neutral-500 hover:text-primary hover:border-primary-light hover:bg-primary-light transition-all"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-7 py-6">
+            <div>
+              <h2 className="text-2xl font-bold text-neutral-900">{headerTitle}</h2>
+              <p className="mt-1 text-sm text-neutral-500">{timezoneLabel}</p>
             </div>
 
-            {/* Weekly View */}
-            <div className="flex flex-col min-w-[700px] overflow-x-auto">
-              {/* Day Headers */}
-              <div className="grid grid-cols-8 border-b border-neutral-200 bg-surface-tinted">
-                <div className="col-span-1 border-r border-neutral-200 p-4 text-center text-[11px] font-bold text-neutral-400 uppercase tracking-wider flex items-center justify-center">
-                  {Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop().replace('_', ' ')}
+            <div className="flex items-center gap-2">
+              {weekOffset !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => setWeekOffset(0)}
+                  className="rounded-xl border border-primary-light bg-primary-light/20 px-4 py-2 text-sm font-bold text-primary transition hover:bg-primary-light/30"
+                >
+                  Back to today
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setWeekOffset((current) => current - 1)}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-neutral-200 text-neutral-500 transition hover:border-primary-light hover:bg-primary-light/10 hover:text-primary"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setWeekOffset(0)}
+                className="rounded-xl border border-neutral-200 px-5 py-2 text-sm font-bold text-neutral-700 transition hover:border-primary-light hover:bg-primary-light/10 hover:text-primary"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setWeekOffset((current) => current + 1)}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-neutral-200 text-neutral-500 transition hover:border-primary-light hover:bg-primary-light/10 hover:text-primary"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <div className="min-w-[1120px]">
+              <div className="grid grid-cols-[90px_repeat(7,minmax(140px,1fr))] border-b border-neutral-200">
+                <div className="border-r border-neutral-200 px-4 py-5 text-xs font-bold uppercase tracking-[0.18em] text-neutral-400">
+                  {timezoneLabel.split('/').pop()?.replace('_', ' ')}
                 </div>
-                {weekDays.map((day, idx) => {
-                  const isToday = isSameDay(day, now);
+
+                {weekDays.map((day) => {
+                  const today = isSameDay(day, now)
                   return (
-                    <div key={idx} className={`col-span-1 border-r border-neutral-200 py-3 flex flex-col items-center justify-center transition-colors ${isToday ? 'bg-primary/5' : ''}`}>
-                      <p className={`text-[10px] font-bold tracking-wider uppercase mb-1.5 ${isToday ? 'text-primary' : 'text-neutral-400'}`}>
+                    <div
+                      key={dateKey(day)}
+                      className="border-r border-neutral-200 px-3 py-4 text-center last:border-r-0"
+                    >
+                      <div className="text-xs font-bold uppercase tracking-[0.18em] text-neutral-400">
                         {DAY_LABELS[day.getDay()]}
-                      </p>
-                      <div className={`w-8 h-8 flex items-center justify-center rounded-full text-[17px] font-bold tracking-tight ${isToday ? 'bg-primary text-white shadow-md shadow-primary/30' : 'text-neutral-800'}`}>
+                      </div>
+                      <div
+                        className={`mt-2 inline-flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold ${today ? 'bg-primary text-white shadow-float-primary' : 'text-neutral-900'
+                          }`}
+                      >
                         {day.getDate()}
                       </div>
                     </div>
-                  );
+                  )
                 })}
               </div>
 
-              {/* Time Grid */}
-              {isLoading ? (
-                <div className="flex items-center justify-center py-24 bg-surface">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                    <p className="text-neutral-400 font-medium text-sm animate-pulse">Loading schedule…</p>
-                  </div>
-                </div>
+              {isLoading || availabilityLoading ? (
+                <div className="px-6 py-10 text-center text-neutral-500">Loading schedule…</div>
               ) : (
-                <div className="relative overflow-y-auto bg-surface text-neutral-900" style={{ height: '560px' }}>
-                  <div className="grid grid-cols-8" style={{ height: `${HOUR_LABELS.length * HOUR_HEIGHT_REM}rem` }}>
-                    {/* Time labels */}
-                    <div className="col-span-1 border-r border-neutral-200 bg-surface-tinted">
-                      {HOUR_LABELS.map(time => (
-                        <div key={time} className="relative border-b border-dashed border-neutral-200/80" style={{ height: `${HOUR_HEIGHT_REM}rem` }}>
-                          <div className="absolute -top-[14px] right-2 z-10">
-                            <span className="bg-white border border-neutral-200 text-neutral-500 text-[9px] font-bold px-2 py-1 rounded-lg shadow-sm whitespace-nowrap tracking-tight">
-                              {time}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Day columns */}
-                    {weekDays.map((day, dIdx) => {
-                      const isToday = isSameDay(day, now);
-                      const dayIdx = day.getDay();
-                      const daySessions = sessionsByDay[dayIdx] || [];
-                      const dayAvailabilities = availabilities.filter(a => Number(a.dayOfWeek) === dayIdx && a.isActive);
-
-                      return (
-                        <div key={dIdx} className={`col-span-1 border-r border-neutral-200 relative ${isToday ? 'bg-primary-light/5' : ''}`}>
-                          {/* Grid lines */}
-                          {HOUR_LABELS.map((_, i) => (
-                            <div key={i} className="border-b border-dashed border-neutral-200/60" style={{ height: `${HOUR_HEIGHT_REM}rem` }} />
-                          ))}
-
-                          {/* Render availability blocks (background, split by sessions) */}
-                          {(() => {
-                            const freeSegments = [];
-
-                            dayAvailabilities.forEach(avail => {
-                              const [startH, startM] = avail.startTime.split(':').map(Number);
-                              const [endH, endM] = avail.endTime.split(':').map(Number);
-
-                              const aStart = new Date(day);
-                              aStart.setHours(startH, startM, 0, 0);
-                              const aEnd = new Date(day);
-                              aEnd.setHours(endH, endM, 0, 0);
-
-                              let segments = [{ start: aStart.getTime(), end: aEnd.getTime() }];
-
-                              daySessions.forEach(session => {
-                                if (session.status === 'cancelled') return;
-                                const sStart = new Date(session.startsAt).getTime();
-                                const sEnd = sStart + (session.durationMinutes || 50) * 60000;
-
-                                const nextSegments = [];
-                                segments.forEach(seg => {
-                                  // If session is completely outside segment
-                                  if (sEnd <= seg.start || sStart >= seg.end) {
-                                    nextSegments.push(seg);
-                                  } else {
-                                    // Split segment
-                                    if (sStart > seg.start) {
-                                      nextSegments.push({ start: seg.start, end: sStart });
-                                    }
-                                    if (sEnd < seg.end) {
-                                      nextSegments.push({ start: sEnd, end: seg.end });
-                                    }
-                                  }
-                                });
-                                segments = nextSegments;
-                              });
-
-                              segments.forEach(seg => {
-                                freeSegments.push({
-                                  ...avail,
-                                  segStart: new Date(seg.start),
-                                  segEnd: new Date(seg.end)
-                                });
-                              });
-                            });
-
-                            return freeSegments.map((seg, sIdx) => {
-                              const start = seg.segStart;
-                              const end = seg.segEnd;
-                              const startMin8 = (start.getHours() - GRID_START_HOUR) * 60 + start.getMinutes();
-                              const endMin8 = (end.getHours() - GRID_START_HOUR) * 60 + end.getMinutes();
-
-                              if (startMin8 < 0 || start.getHours() >= GRID_END_HOUR) return null;
-
-                              const topRem = (startMin8 / 60) * HOUR_HEIGHT_REM;
-                              const durationMin = Math.max(endMin8 - startMin8, 0);
-                              const heightRem = (durationMin / 60) * HOUR_HEIGHT_REM;
-
-                              if (heightRem < 0.2) return null;
-
-                              const timeString = `${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-
-                              return (
-                                <div
-                                  key={`${seg.id}-${sIdx}`}
-                                  className="absolute left-0.5 right-0.5 rounded-2xl z-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden border border-primary/10 bg-primary-light/10 backdrop-blur-[2px] transition-all"
-                                  style={{
-                                    top: `${topRem}rem`,
-                                    height: `${heightRem}rem`
-                                  }}
-                                >
-                                  {heightRem >= 1.2 && (
-                                    <div className="flex flex-col items-center opacity-40 transition-opacity">
-                                      <span className="text-[8px] font-black text-primary tracking-widest uppercase mb-0.5">Available</span>
-                                      <span className="text-[9px] font-bold text-primary/70">{timeString}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            });
-                          })()}
-
-                          {/* Current time indicator */}
-                          {isToday && (() => {
-                            const minutesSince8 = (now.getHours() - GRID_START_HOUR) * 60 + now.getMinutes();
-                            if (minutesSince8 < 0 || minutesSince8 > (GRID_END_HOUR - GRID_START_HOUR) * 60) return null;
-                            const topPx = (minutesSince8 / 60) * HOUR_HEIGHT_REM;
-                            return (
-                              <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: `${topPx}rem` }}>
-                                <div className="flex items-center">
-                                  <div className="w-2.5 h-2.5 bg-alert rounded-full -ml-1 shadow-md" />
-                                  <div className="flex-1 h-[2px] bg-alert/60" />
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {/* Render real sessions */}
-                          {daySessions.map((session, eIdx) => {
-                            const start = new Date(session.startsAt);
-                            const hour = start.getHours();
-                            const minute = start.getMinutes();
-                            const minutesSince8 = (hour - GRID_START_HOUR) * 60 + minute;
-
-                            // Skip sessions outside grid range
-                            if (minutesSince8 < 0 || hour >= GRID_END_HOUR) return null;
-
-                            const topRem = (minutesSince8 / 60) * HOUR_HEIGHT_REM;
-                            const durationMin = session.durationMinutes || 50;
-                            const heightRem = (durationMin / 60) * HOUR_HEIGHT_REM;
-                            const isCancelled = session.status === 'cancelled';
-
-                            return (
-                              <div
-                                key={session.id || eIdx}
-                                className={`absolute left-1.5 right-1.5 rounded-2xl shadow-float z-10 transition-all cursor-pointer border group
-                                  ${isCancelled
-                                    ? 'bg-neutral-100 border-neutral-200 opacity-50'
-                                    : 'bg-primary text-white border-primary-hover border-b-2 hover:-translate-y-0.5 hover:shadow-lg'
-                                  }`}
-                                style={{ top: `${topRem}rem`, height: `${Math.max(heightRem, 3)}rem` }}
-                                title={`${session.patientAlias || 'Client'} – ${session.type || 'Session'}`}
-                              >
-                                <div className="p-2.5 h-full flex flex-col justify-between overflow-hidden">
-                                  <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide opacity-80">
-                                    {getTypeIcon(session.type)}
-                                    <span>
-                                      {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                  <p className="font-bold text-[12px] truncate leading-tight mt-0.5">
-                                    {session.patientAlias || 'Client'}
-                                  </p>
-                                  {isCancelled && (
-                                    <span className="text-[10px] font-bold text-alert">Cancelled</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
+                <div className="grid grid-cols-[90px_repeat(7,minmax(140px,1fr))]">
+                  <div className="relative border-r border-neutral-200">
+                    {hours.map((hour) => (
+                      <div
+                        key={hour}
+                        className="flex items-start justify-end border-b border-dashed border-neutral-100 pr-3 pt-1 text-[11px] font-semibold text-neutral-400"
+                        style={{ height: `${HOUR_HEIGHT_REM}rem` }}
+                      >
+                        {new Date(2000, 0, 1, hour).toLocaleTimeString([], {
+                          hour: 'numeric'
+                        })}
+                      </div>
+                    ))}
                   </div>
+
+                  {weekDays.map((day) => {
+                    const key = dateKey(day)
+                    const daySessions = sessionsByDate.get(key) || []
+                    const dayAvailabilities = availabilities.filter(
+                      (availability) =>
+                        Number(availability.dayOfWeek) === day.getDay() && availability.isActive
+                    )
+
+                    const freeSegments = buildAvailabilitySegments(day, dayAvailabilities, daySessions)
+                    const isToday = isSameDay(day, now)
+
+                    return (
+                      <div key={key} className="relative border-r border-neutral-200 last:border-r-0">
+                        {hours.map((hour) => (
+                          <div
+                            key={`${key}-${hour}`}
+                            className="border-b border-dashed border-neutral-100"
+                            style={{ height: `${HOUR_HEIGHT_REM}rem` }}
+                          />
+                        ))}
+
+                        {freeSegments.map((segment) => {
+                          const start = segment.segmentStart
+                          const end = segment.segmentEnd
+
+                          const startMinutes =
+                            (start.getHours() - GRID_START_HOUR) * 60 + start.getMinutes()
+                          const endMinutes =
+                            (end.getHours() - GRID_START_HOUR) * 60 + end.getMinutes()
+
+                          if (endMinutes <= 0 || startMinutes >= (GRID_END_HOUR - GRID_START_HOUR) * 60) {
+                            return null
+                          }
+
+                          const clampedStart = Math.max(startMinutes, 0)
+                          const clampedEnd = Math.min(
+                            endMinutes,
+                            (GRID_END_HOUR - GRID_START_HOUR) * 60
+                          )
+
+                          const topRem = (clampedStart / 60) * HOUR_HEIGHT_REM
+                          const heightRem = ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT_REM
+
+                          if (heightRem < 0.35) return null
+
+                          return (
+                            <div
+                              key={`${segment.id}-${segment.segmentStart.toISOString()}`}
+                              className="absolute left-2 right-2 overflow-hidden rounded-[26px] border border-primary-light bg-primary-light/15 px-3 py-3"
+                              style={{ top: `${topRem}rem`, height: `${heightRem}rem` }}
+                            >
+                              <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-primary">
+                                Available
+                              </div>
+                              <div className="mt-1 text-xs font-semibold text-primary/80">
+                                {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} –{' '}
+                                {end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {isToday && (() => {
+                          const minutesSinceStart =
+                            (now.getHours() - GRID_START_HOUR) * 60 + now.getMinutes()
+
+                          if (
+                            minutesSinceStart < 0 ||
+                            minutesSinceStart > (GRID_END_HOUR - GRID_START_HOUR) * 60
+                          ) {
+                            return null
+                          }
+
+                          const topRem = (minutesSinceStart / 60) * HOUR_HEIGHT_REM
+
+                          return (
+                            <div
+                              className="absolute left-0 right-0 z-20"
+                              style={{ top: `${topRem}rem` }}
+                            >
+                              <div className="absolute -left-1.5 h-3 w-3 rounded-full bg-red-400" />
+                              <div className="h-[2px] w-full bg-red-300" />
+                            </div>
+                          )
+                        })()}
+
+                        {daySessions.map((session) => {
+                          const start = toDate(session.startsAt)
+                          if (!start) return null
+
+                          const minutesSinceStart =
+                            (start.getHours() - GRID_START_HOUR) * 60 + start.getMinutes()
+
+                          if (
+                            minutesSinceStart < 0 ||
+                            minutesSinceStart >= (GRID_END_HOUR - GRID_START_HOUR) * 60
+                          ) {
+                            return null
+                          }
+
+                          const duration = getSessionDuration(session)
+                          const topRem = (minutesSinceStart / 60) * HOUR_HEIGHT_REM
+                          const heightRem = Math.max((duration / 60) * HOUR_HEIGHT_REM, 1.1)
+
+                          return (
+                            <div
+                              key={session.id}
+                              className={`absolute left-2 right-2 z-10 rounded-[24px] px-3 py-3 shadow-sm ${session.status === 'cancelled'
+                                ? 'border border-red-200 bg-red-50 text-red-700'
+                                : 'border border-primary bg-primary text-white shadow-float-primary'
+                                }`}
+                              style={{ top: `${topRem}rem`, height: `${heightRem}rem` }}
+                            >
+                              <div className="mb-1 flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] opacity-90">
+                                {getTypeIcon(session.type)}
+                                {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                              </div>
+                              <div className="truncate text-sm font-bold">
+                                {session.patientAlias || 'Client'}
+                              </div>
+                              <div className="mt-1 truncate text-xs opacity-90">
+                                {session.type || 'Session'}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
           </div>
         </motion.div>
 
-        {/* ─── Right Sidebar ─── */}
         <div className="space-y-6">
-          {/* Today's Sessions Detail */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
+            initial={{ opacity: 0, x: 14 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="rounded-[32px] border border-neutral-200 bg-white p-6 shadow-card"
           >
-            <Card hover={false} className="p-6">
-              <h3 className="text-lg font-bold text-neutral-900 tracking-tight mb-1">Today's Sessions</h3>
-              <p className="text-[13px] font-medium text-neutral-400 mb-5">
-                {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-              </p>
+            <h3 className="text-2xl font-bold text-neutral-900">Today&apos;s Sessions</h3>
+            <p className="mt-1 text-sm text-neutral-500">
+              {now.toLocaleDateString(undefined, {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </p>
 
-              {isLoading ? (
-                <div className="py-8 flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
-                </div>
-              ) : todaySessions.length === 0 ? (
-                <div className="py-10 text-center bg-surface-tinted rounded-2xl border border-dashed border-neutral-200">
-                  <CalendarIcon size={28} className="text-neutral-300 mx-auto mb-3" />
-                  <p className="text-neutral-500 font-medium text-sm">No sessions today</p>
-                  <p className="text-neutral-400 text-[12px] mt-1">Enjoy your free time!</p>
+            <div className="mt-5 space-y-4">
+              {todaySessions.length === 0 ? (
+                <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-8 text-center">
+                  <CalendarIcon className="mx-auto h-8 w-8 text-neutral-300" />
+                  <div className="mt-3 text-sm font-semibold text-neutral-700">No sessions today</div>
+                  <div className="mt-1 text-sm text-neutral-500">Enjoy your free time!</div>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {todaySessions.map((session) => {
-                    const start = new Date(session.startsAt);
-                    return (
-                      <div key={session.id} className="flex items-start gap-3 p-3.5 rounded-2xl bg-surface-tinted border border-neutral-100 hover:border-primary-light transition-colors group">
-                        <Avatar name={session.patientAlias || 'Client'} size="sm" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-[14px] text-neutral-900 truncate">{session.patientAlias || 'Client'}</p>
-                          <div className="flex items-center gap-1.5 text-[12px] font-medium text-neutral-500 mt-0.5">
-                            {getTypeIcon(session.type)}
-                            <span>{start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-                            {session.type && <span className="text-neutral-300">·</span>}
-                            {session.type && <span className="capitalize">{session.type}</span>}
+                todaySessions.map((session) => {
+                  const start = toDate(session.startsAt)
+                  return (
+                    <div
+                      key={session.id}
+                      className="rounded-[24px] border border-neutral-200 bg-surface p-5"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-light text-sm font-bold text-primary">
+                          {(session.patientAlias || 'C').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-bold text-neutral-900">
+                            {session.patientAlias || 'Client'}
                           </div>
-                          <div className="mt-2">
-                            <JoinSessionButton
-                              startsAt={session.startsAt}
-                              sessionId={session.id}
-                              role="professional"
-                              size="sm"
-                            />
+                          <div className="mt-1 flex items-center gap-2 text-sm text-neutral-500">
+                            {getTypeIcon(session.type)}
+                            <span>
+                              {start?.toLocaleTimeString([], {
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                            {session.type ? <span>· {session.type}</span> : null}
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  )
+                })
               )}
-            </Card>
+            </div>
           </motion.div>
 
-          {/* Availability */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.3 }}
+            initial={{ opacity: 0, x: 14 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="rounded-[32px] border border-neutral-200 bg-white p-6 shadow-card"
           >
-            <Card hover={false} className="p-6 relative overflow-hidden group">
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-accent/5 rounded-full blur-2xl pointer-events-none group-hover:bg-accent/10 transition-colors duration-500" />
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="p-2.5 bg-accent-light/40 rounded-xl border border-accent/10">
-                    <Settings2 size={18} className="text-accent" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-neutral-900 tracking-tight">Availability</h3>
-                    <p className="text-[12px] font-medium text-neutral-400">Manage working hours</p>
-                  </div>
-                </div>
-                <div className="py-6 px-4 text-center bg-gradient-to-b from-surface-tinted to-surface rounded-2xl border border-neutral-200/60 shadow-inner-soft">
-                  <p className="text-neutral-500 font-medium text-sm mb-4">
-                    {availabilities.length} active schedule rule{availabilities.length !== 1 ? 's' : ''}
-                  </p>
-                  <Button variant="primary" size="md" className="w-full justify-center shadow-md hover:shadow-lg transition-shadow" onClick={() => setIsManageModalOpen(true)}>
-                    Manage Schedule
-                  </Button>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-light/20 text-primary">
+                <Settings2 className="h-5 w-5" />
               </div>
-            </Card>
+              <div>
+                <h3 className="text-2xl font-bold text-neutral-900">Availability</h3>
+                <p className="text-sm text-neutral-500">Manage working hours</p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-[24px] border border-neutral-200 bg-surface p-5">
+              <div className="text-center text-neutral-700">
+                <span className="font-bold">{availabilities.length}</span> active schedule rule
+                {availabilities.length !== 1 ? 's' : ''}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsManageModalOpen(true)}
+                className="mt-5 flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-4 text-sm font-bold text-white shadow-float-primary transition hover:opacity-95"
+              >
+                Manage Schedule
+              </button>
+            </div>
           </motion.div>
         </div>
       </div>
 
-      {/* Manage Availability Modal */}
       <ManageAvailabilityModal
         isOpen={isManageModalOpen}
         onClose={() => setIsManageModalOpen(false)}
@@ -486,22 +567,39 @@ const Calendar = () => {
         onDelete={deleteAvailability}
         professionalId={user?.uid}
       />
-    </div>
-  );
-};
+    </>
+  )
+}
 
-const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDelete, professionalId }) => {
-  const [dayOfWeek, setDayOfWeek] = useState(1);
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('17:00');
-  const [slotDuration, setSlotDuration] = useState(50);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const ManageAvailabilityModal = ({
+  isOpen,
+  onClose,
+  availabilities,
+  onAdd,
+  onDelete,
+  professionalId
+}) => {
+  const [dayOfWeek, setDayOfWeek] = useState(1)
+  const [startTime, setStartTime] = useState('09:00')
+  const [endTime, setEndTime] = useState('17:00')
+  const [slotDuration, setSlotDuration] = useState(50)
+  const [breakMinutes, setBreakMinutes] = useState(10)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   const handleAdd = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+    e.preventDefault()
+
+    if (!professionalId) return
+
+    if (startTime >= endTime) {
+      alert('End time must be after start time.')
+      return
+    }
+
+    setIsSubmitting(true)
+
     try {
       await onAdd({
         professionalId,
@@ -509,120 +607,156 @@ const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDel
         startTime,
         endTime,
         slotDuration: Number(slotDuration),
-        breakMinutes: 10,
+        breakMinutes: Number(breakMinutes),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         isActive: true
-      });
+      })
+
+      setStartTime('09:00')
+      setEndTime('17:00')
+      setSlotDuration(50)
+      setBreakMinutes(10)
     } catch (error) {
-      console.error(error);
+      console.error(error)
+      alert('Could not save this availability rule. Please try again.')
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
+
+  const sortedAvailabilities = [...availabilities].sort((a, b) => {
+    if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek
+    return String(a.startTime).localeCompare(String(b.startTime))
+  })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1A1A]/40 backdrop-blur-sm p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-surface rounded-3xl shadow-float max-w-lg w-full overflow-hidden border border-neutral-200"
-      >
-        <div className="px-6 py-5 border-b border-neutral-200 bg-surface-tinted flex justify-between items-center">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-950/45 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[32px] border border-neutral-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-neutral-200 px-7 py-6">
           <div>
-            <h2 className="text-xl font-bold text-neutral-900 tracking-tight">Manage Availability</h2>
-            <p className="text-sm font-medium text-neutral-500">Define your weekly recurring schedule</p>
+            <h2 className="text-3xl font-bold text-neutral-900">Manage Availability</h2>
+            <p className="mt-1 text-neutral-500">Define your weekly recurring schedule</p>
           </div>
-          <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-full transition-colors">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+          >
+            <Trash2 className="h-5 w-5 rotate-45" />
           </button>
         </div>
 
-        <div className="p-6 max-h-[60vh] overflow-y-auto space-y-6">
-          <form onSubmit={handleAdd} className="space-y-4 bg-surface-tinted p-5 rounded-2xl border border-neutral-200">
-            <h3 className="text-sm font-bold text-neutral-900 tracking-wider uppercase mb-2">Add New Rule</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase">Day of Week</label>
+        <div className="space-y-8 p-7">
+          <form onSubmit={handleAdd} className="rounded-[28px] border border-neutral-200 p-5">
+            <h3 className="mb-4 text-lg font-bold text-neutral-900">Add New Rule</h3>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-neutral-700">Day of Week</span>
                 <select
                   value={dayOfWeek}
                   onChange={(e) => setDayOfWeek(e.target.value)}
-                  className="w-full bg-surface border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
                 >
-                  {DAY_LABELS.map((day, idx) => (
-                    <option key={idx} value={idx}>{day}</option>
+                  {DAY_LABELS.map((day, index) => (
+                    <option key={day} value={index}>
+                      {day}
+                    </option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase">Start Time</label>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-neutral-700">Slot Duration (mins)</span>
+                <input
+                  type="number"
+                  min="15"
+                  max="180"
+                  value={slotDuration}
+                  onChange={(e) => setSlotDuration(e.target.value)}
+                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-neutral-700">Start Time</span>
                 <input
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  required
-                  className="w-full bg-surface border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase">End Time</label>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-neutral-700">End Time</span>
                 <input
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  required
-                  className="w-full bg-surface border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
                 />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase">Slot Duration (mins)</label>
+              </label>
+
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-sm font-semibold text-neutral-700">Break (mins)</span>
                 <input
                   type="number"
-                  min="15"
-                  step="5"
-                  value={slotDuration}
-                  onChange={(e) => setSlotDuration(e.target.value)}
-                  required
-                  className="w-full bg-surface border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  min="0"
+                  max="120"
+                  value={breakMinutes}
+                  onChange={(e) => setBreakMinutes(e.target.value)}
+                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
                 />
-              </div>
+              </label>
             </div>
-            <Button type="submit" variant="primary" className="w-full justify-center mt-2" disabled={isSubmitting}>
-              {isSubmitting ? 'Adding...' : 'Add Rule'}
-            </Button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="mt-5 flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-4 text-sm font-bold text-white shadow-float-primary transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? 'Adding…' : 'Add Rule'}
+            </button>
           </form>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <Clock size={16} className="text-primary" />
-              <h3 className="text-sm font-bold text-neutral-900 tracking-wider uppercase">Weekly Schedule</h3>
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              <h3 className="text-lg font-bold text-neutral-900">Weekly Schedule</h3>
             </div>
-            {availabilities.length === 0 ? (
-              <div className="text-center py-8 bg-surface-tinted rounded-2xl border border-dashed border-neutral-200">
-                <p className="text-sm font-medium text-neutral-500">No availability rules set yet.</p>
+
+            {sortedAvailabilities.length === 0 ? (
+              <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-6 text-center text-neutral-500">
+                No availability rules set yet.
               </div>
             ) : (
-              <div className="space-y-2">
-                {availabilities.sort((a, b) => a.dayOfWeek - b.dayOfWeek).map((avail) => (
-                  <div key={avail.id} className="group flex items-center justify-between p-4 bg-surface border border-neutral-200 rounded-2xl hover:border-primary/30 hover:shadow-sm transition-all">
+              <div className="space-y-3">
+                {sortedAvailabilities.map((availability) => (
+                  <div
+                    key={availability.id}
+                    className="flex items-center justify-between rounded-[24px] border border-neutral-200 p-4"
+                  >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-primary-light/30 flex items-center justify-center text-primary font-bold text-xs">
-                        {DAY_LABELS[avail.dayOfWeek]?.substring(0, 3)}
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-light/20 text-sm font-bold text-primary">
+                        {DAY_LABELS[availability.dayOfWeek]?.slice(0, 3)}
                       </div>
                       <div>
-                        <p className="text-[14px] font-bold text-neutral-900">
-                          {avail.startTime} - {avail.endTime}
-                        </p>
-                        <p className="text-[12px] font-medium text-neutral-500">
-                          {avail.slotDuration}m sessions · {avail.breakMinutes}m break
-                        </p>
+                        <div className="font-bold text-neutral-900">
+                          {availability.startTime} - {availability.endTime}
+                        </div>
+                        <div className="mt-1 text-sm text-neutral-500">
+                          {availability.slotDuration}m sessions · {availability.breakMinutes}m break
+                        </div>
                       </div>
                     </div>
+
                     <button
-                      onClick={() => onDelete(avail.id)}
-                      className="p-2.5 text-neutral-400 hover:text-alert hover:bg-alert/5 rounded-xl transition-all"
-                      title="Delete Rule"
+                      type="button"
+                      onClick={() => onDelete(availability.id)}
+                      className="rounded-xl p-2 text-neutral-400 transition hover:bg-red-50 hover:text-red-600"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
@@ -630,9 +764,9 @@ const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDel
             )}
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
-  );
-};
+  )
+}
 
-export default Calendar;
+export default Calendar

@@ -1,22 +1,48 @@
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, X, CreditCard, CheckCircle, Calendar as CalendarIcon, Clock, ChevronRight, AlertCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  AlertCircle,
+  Calendar as CalendarIcon,
+  CheckCircle,
+  Clock,
+  CreditCard,
+  Shield,
+  X
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Elements } from '@stripe/react-stripe-js'
-import { stripePromise } from '../../lib/stripe'
+import {
+  collection,
+  doc,
+  getDocs,
+  query,
+  runTransaction,
+  serverTimestamp,
+  where
+} from 'firebase/firestore'
 import { db } from '../../lib/firebase'
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, runTransaction } from 'firebase/firestore'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatStore } from '../../stores/chatStore'
 import { getAvailableSlots, resolveProId } from '../../utils/slotUtils'
-import Button from '../ui/Button'
-import Input from '../ui/Input'
+
+const ACTIVE_BOOKING_STATUSES = new Set(['upcoming', 'confirmed', 'active', 'in_progress'])
+
+const buildBookingId = (professionalId, startsAt) => {
+  const iso = new Date(startsAt).toISOString().replace(/[^a-zA-Z0-9]/g, '_')
+  return `booking_${professionalId}_${iso}`
+}
+
+const getSpecialtyLabel = (pro) => {
+  if (Array.isArray(pro?.specialties) && pro.specialties.length > 0) {
+    return pro.specialties.join(', ')
+  }
+  return pro?.specialties || pro?.title || 'Specialist'
+}
 
 function CheckoutForm({ pro, onClose }) {
   const navigate = useNavigate()
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [method, setMethod] = useState('card') // 'card' or 'bank'
+  const [method, setMethod] = useState('card')
   const [availableDays, setAvailableDays] = useState([])
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [loadingSlots, setLoadingSlots] = useState(true)
@@ -24,203 +50,249 @@ function CheckoutForm({ pro, onClose }) {
   const [resolvedProId, setResolvedProId] = useState(null)
 
   useEffect(() => {
+    let alive = true
+
     async function loadData() {
-      setLoadingSlots(true);
-      setSlotError(null);
+      setLoadingSlots(true)
+      setSlotError(null)
+      setSelectedSlot(null)
+
       try {
-        const uid = await resolveProId(pro);
-        setResolvedProId(uid);
-        if (uid) {
-          const days = await getAvailableSlots(pro);
-          setAvailableDays(days);
-        } else {
-          setSlotError("Could not identify this professional. Please try another.");
+        const canonicalUid = await resolveProId(pro)
+        if (!alive) return
+        setResolvedProId(canonicalUid)
+
+        // Try to load slots, but catch and handle permission errors gracefully
+        try {
+          const days = await getAvailableSlots({ ...pro, uid: canonicalUid }, 14)
+          if (!alive) return
+          setAvailableDays(days)
+          setSlotError(null)
+        } catch (slotErr) {
+          console.warn('[CheckoutModal] Slot load warning:', slotErr)
+          if (!alive) return
+          setSlotError(slotErr?.message?.includes('permission') 
+            ? 'This professional\'s availability is currently restricted. They may need to finalize their profile setup.' 
+            : (slotErr?.message || 'No available slots found.'))
+          setAvailableDays([])
         }
-      } catch (err) {
-        console.error("Error loading slots:", err);
-        setSlotError("Failed to load availability. Please try refreshing or contact support.");
+      } catch (error) {
+        console.error('[CheckoutModal] Fatal error:', error)
+        if (!alive) return
+        setSlotError('Could not initialize booking. Please try another professional.')
       } finally {
-        setLoadingSlots(false);
+        if (alive) setLoadingSlots(false)
       }
     }
-    loadData();
-  }, [pro]);
+
+    loadData()
+
+    return () => {
+      alive = false
+    }
+  }, [pro])
+
+  const selectableSlotCount = useMemo(
+    () =>
+      availableDays.reduce(
+        (count, day) => count + day.slots.filter((slot) => !slot.isBooked).length,
+        0
+      ),
+    [availableDays]
+  )
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!selectedSlot) {
-      alert("Please select an available time slot first.");
-      return;
+      alert('Please select an available time slot first.')
+      return
     }
 
     setProcessing(true)
-    
+
     try {
-      const { user } = useAuthStore.getState();
-      
-      if (!user) {
-        throw new Error("You must be signed in to book a session.");
+      const { user } = useAuthStore.getState()
+      if (!user?.uid) {
+        throw new Error('You must be signed in to book a session.')
       }
 
-      // Re-resolve ID to be absolutely sure we have the canonical UID
-      const canonicalProId = resolvedProId || (await resolveProId(pro));
+      const canonicalProId = resolvedProId || (await resolveProId(pro))
       if (!canonicalProId) {
-        throw new Error("Could not resolve professional identity. Please try again.");
+        throw new Error('Could not resolve professional identity. Please try again.')
       }
 
-      // 0. Double-check if the slot is STILL available in Firestore
-      console.log('[Checkout] Re-checking slot availability for:', canonicalProId);
-      const currentSlots = await getAvailableSlots(pro);
-      const isStillAvailable = currentSlots.some(day => 
-        day.slots.some(slot => !slot.isBooked && slot.startsAt.getTime() === selectedSlot.startsAt.getTime())
-      );
+      const latestDays = await getAvailableSlots({ ...pro, uid: canonicalProId }, 14)
 
-      if (!isStillAvailable) {
-        throw new Error("This time slot was just booked by someone else. Please select another time.");
+      const selectedStillFree = latestDays.some((day) =>
+        day.slots.some(
+          (slot) =>
+            slot.startsAt.getTime() === selectedSlot.startsAt.getTime() && slot.isBooked === false
+        )
+      )
+
+      if (!selectedStillFree) {
+        throw new Error('This time slot was just booked by someone else. Please select another.')
       }
 
-      const specialty = Array.isArray(pro.specialties) ? pro.specialties.join(', ') : (pro.specialties || pro.title || 'Specialist')
+      const startsAtIso = new Date(selectedSlot.startsAt).toISOString()
+      const bookingId = buildBookingId(canonicalProId, startsAtIso)
 
-      // 1. Create the booking object with canonical UID
+      const specialty = getSpecialtyLabel(pro)
       const bookingData = {
         patientId: user.uid,
         patientAlias: user.alias || user.name || 'Anonymous',
         professionalId: canonicalProId,
-        proName: pro.name || 'Specialist',
+        proName: pro?.name || 'Specialist',
         proSpecialty: specialty,
-        startsAt: selectedSlot.startsAt.toISOString(),
-        duration: selectedSlot.duration || 50,
+        startsAt: startsAtIso,
+        duration: Number(selectedSlot.duration || 50),
         status: 'upcoming',
         type: 'Video',
-        amount: pro.pricePerSession || 3000,
-        currency: pro.currency || 'PKR',
+        amount: Number(pro?.pricePerSession || 3000),
+        currency: pro?.currency || 'PKR',
         createdAt: serverTimestamp()
       }
 
-      console.log('[Checkout] Creating real booking in Firestore with collision check:', bookingData);
+      const bookingRef = doc(db, 'bookings', bookingId)
 
-      // 2. Write to Firestore with collision check
-      // We use a transaction to ensure atomicity
       await runTransaction(db, async (transaction) => {
-        // Query for existing upcoming bookings for this professional at this exact time
-        const q = query(
-          collection(db, 'bookings'),
-          where('professionalId', '==', canonicalProId),
-          where('startsAt', '==', bookingData.startsAt),
-          where('status', '==', 'upcoming')
-        );
-        const snapshot = await getDocs(q);
-        
-        if (!snapshot.empty) {
-          throw new Error("Conflict: This slot was just confirmed for another patient.");
+        const existingBooking = await transaction.get(bookingRef)
+
+        if (existingBooking.exists()) {
+          const existingData = existingBooking.data()
+          if (ACTIVE_BOOKING_STATUSES.has(existingData.status)) {
+            throw new Error('This time slot has already been booked. Please choose another.')
+          }
         }
 
-        // Proceed to create booking
-        const newBookingRef = doc(collection(db, 'bookings'));
-        transaction.set(newBookingRef, bookingData);
-      });
+        // Note: We don't need a collisionQuery here because the bookingId 
+        // is deterministic (professionalId + startsAt). If another booking 
+        // exists for this exact slot, existingBooking.exists() will be true.
 
-      // 3. Ensure a conversation exists for the chat system
-      await useChatStore.getState().ensureConversation(pro);
+        transaction.set(bookingRef, bookingData)
+      })
 
-      setProcessing(false)
+      try {
+        await useChatStore
+          .getState()
+          .ensureConversation({ ...pro, uid: canonicalProId, professionalId: canonicalProId })
+      } catch (conversationError) {
+        console.error('[CheckoutModal] Conversation bootstrap failed:', conversationError)
+      }
+
       setSuccess(true)
-      
+      setProcessing(false)
+
       setTimeout(() => {
         onClose()
         navigate('/patient/bookings')
-      }, 2000)
+      }, 1600)
     } catch (error) {
-      console.error("Payment/Booking Error:", error);
-      setProcessing(false);
-      alert(error.message || "There was an error processing your booking. Please try again.");
+      console.error('[CheckoutModal] Booking error:', error)
+      setProcessing(false)
+      alert(error?.message || 'There was an error processing your booking. Please try again.')
     }
   }
 
   if (success) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6"
-        >
-          <CheckCircle size={40} className="text-green-500" />
-        </motion.div>
-        <h3 className="text-2xl font-bold text-neutral-900 mb-2">Connection Secured</h3>
-        <p className="text-neutral-500">Your session with {pro?.name} is confirmed. A secure, encrypted channel has been established for your privacy.</p>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-[28px] border border-primary-light bg-white p-8 text-center"
+      >
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-light">
+          <CheckCircle className="h-8 w-8 text-primary" />
+        </div>
+        <h3 className="mb-2 text-2xl font-bold text-neutral-900">Connection Secured</h3>
+        <p className="text-neutral-600">
+          Your session with <span className="font-semibold">{pro?.name}</span> is confirmed.
+        </p>
+      </motion.div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Price Display */}
-      <div className="bg-primary-light/40 p-6 rounded-[24px] border border-primary-light flex items-center gap-4">
-        <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center flex-shrink-0 font-bold text-primary">
-          {pro?.currency || 'PKR'}
-        </div>
-        <div>
-          <p className="text-neutral-500 text-[13px] font-bold uppercase tracking-wider mb-0.5">Total Amount</p>
-          <p className="text-2xl font-bold text-neutral-900">{pro?.currency || 'PKR'} {pro?.pricePerSession?.toLocaleString() || '3,000'} <span className="text-[15px] font-medium text-neutral-400">/ session</span></p>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="rounded-[28px] border border-neutral-200 bg-surface p-5">
+        <div className="mb-3 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-bold text-primary shadow-sm">
+            {pro?.currency || 'PKR'}
+          </div>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-neutral-400">
+              Total Amount
+            </div>
+            <div className="text-3xl font-bold text-neutral-900">
+              {pro?.currency || 'PKR'} {Number(pro?.pricePerSession || 3000).toLocaleString()}
+              <span className="ml-1 text-base font-medium text-neutral-500">/ session</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Slot Selection */}
-      <div className="space-y-4">
-        <h4 className="text-[14px] font-bold text-neutral-900 uppercase tracking-wide flex items-center gap-2">
-          <CalendarIcon size={16} className="text-primary" />
+      <div>
+        <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-neutral-500">
+          <CalendarIcon className="h-4 w-4 text-primary" />
           Select Appointment Time
-        </h4>
+        </div>
 
         {loadingSlots ? (
-          <div className="py-8 flex flex-col items-center gap-3 bg-surface-tinted rounded-[24px] border border-dashed border-neutral-200">
-            <div className="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
-            <p className="text-neutral-400 font-medium text-xs">Finding available slots...</p>
+          <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-6 text-center text-neutral-500">
+            Finding available slots...
           </div>
         ) : slotError ? (
-          <div className="py-8 px-6 text-center bg-red-50 rounded-[24px] border border-dashed border-red-200">
-            <AlertCircle size={24} className="text-red-400 mx-auto mb-2" />
-            <p className="text-red-600 font-bold text-sm">Loading Error</p>
-            <p className="text-red-500 text-xs mt-1">{slotError}</p>
+          <div className="rounded-[24px] border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+            <div className="mb-1 flex items-center gap-2 font-semibold">
+              <AlertCircle className="h-4 w-4" />
+              Loading Error
+            </div>
+            <p>{slotError}</p>
           </div>
-        ) : availableDays.length === 0 ? (
-          <div className="py-8 px-6 text-center bg-surface-tinted rounded-[24px] border border-dashed border-neutral-200">
-            <AlertCircle size={24} className="text-neutral-300 mx-auto mb-2" />
-            <p className="text-neutral-500 font-medium text-sm">No available slots this week</p>
-            <p className="text-neutral-400 text-xs mt-1">Please check back later or contact support.</p>
+        ) : selectableSlotCount === 0 ? (
+          <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-6 text-center">
+            <div className="mb-2 text-sm font-semibold text-neutral-700">
+              No available slots this week
+            </div>
+            <div className="text-sm text-neutral-500">Please check back later or contact support.</div>
           </div>
         ) : (
-          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="space-y-4">
             {availableDays.map((day) => (
-              <div key={day.date.toISOString()} className="space-y-2">
-                <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest px-1">
-                  {day.date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-                </p>
-                <div className="grid grid-cols-3 gap-2">
+              <div key={day.date.toISOString()} className="rounded-[24px] border border-neutral-200 p-4">
+                <div className="mb-3 text-sm font-bold text-neutral-800">
+                  {day.date.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {day.slots.map((slot) => {
-                    const isSelected = selectedSlot?.startsAt.getTime() === slot.startsAt.getTime();
-                    const isBooked = slot.isBooked;
+                    const isSelected =
+                      selectedSlot?.startsAt.getTime() === slot.startsAt.getTime()
 
                     return (
                       <button
                         key={slot.startsAt.toISOString()}
                         type="button"
-                        onClick={() => !isBooked && setSelectedSlot(slot)}
-                        disabled={isBooked}
-                        className={`py-3 px-2 rounded-2xl text-[13px] font-bold transition-all border
-                          ${isBooked
-                            ? 'bg-neutral-50 border-neutral-100 text-neutral-300 cursor-not-allowed'
+                        onClick={() => !slot.isBooked && setSelectedSlot(slot)}
+                        disabled={slot.isBooked}
+                        className={`rounded-2xl border px-3 py-3 text-sm font-bold transition-all ${slot.isBooked
+                            ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300'
                             : isSelected
-                              ? 'bg-primary border-primary text-white shadow-float-primary'
-                              : 'bg-white border-neutral-200 text-neutral-700 hover:border-primary-light hover:bg-primary-light/5 hover:text-primary'
+                              ? 'border-primary bg-primary text-white shadow-float-primary'
+                              : 'border-neutral-200 bg-white text-neutral-700 hover:border-primary-light hover:bg-primary-light/5 hover:text-primary'
                           }`}
                       >
-                        {slot.startsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                        {isBooked && <span className="block text-[9px] mt-0.5 opacity-60">Booked</span>}
+                        <div>{slot.startsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
+                        <div className="mt-1 text-[11px] font-medium opacity-80">
+                          {slot.duration} min
+                        </div>
                       </button>
-                    );
+                    )
                   })}
                 </div>
               </div>
@@ -229,71 +301,82 @@ function CheckoutForm({ pro, onClose }) {
         )}
       </div>
 
-      {/* Method Selection */}
-      <div className="flex p-1 bg-surface-tinted rounded-2xl">
-        <button
-          type="button"
-          onClick={() => setMethod('card')}
-          className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all ${method === 'card' ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}
-        >
-          Credit/Debit Card
-        </button>
-        <button
-          type="button"
-          onClick={() => setMethod('bank')}
-          className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all ${method === 'bank' ? 'bg-white text-primary shadow-sm' : 'text-neutral-500 hover:text-neutral-900'}`}
-        >
-          Online Transfer
-        </button>
+      <div className="rounded-[22px] border border-neutral-200 bg-white p-2">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setMethod('card')}
+            className={`rounded-xl px-4 py-3 text-sm font-bold transition ${method === 'card'
+                ? 'bg-primary text-white shadow-float-primary'
+                : 'text-neutral-500 hover:bg-primary-light/10 hover:text-primary'
+              }`}
+          >
+            Credit/Debit Card
+          </button>
+          <button
+            type="button"
+            onClick={() => setMethod('bank')}
+            className={`rounded-xl px-4 py-3 text-sm font-bold transition ${method === 'bank'
+                ? 'bg-primary text-white shadow-float-primary'
+                : 'text-neutral-500 hover:bg-primary-light/10 hover:text-primary'
+              }`}
+          >
+            Online Transfer
+          </button>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {method === 'card' ? (
-          <div className="space-y-4">
-            <Input label="Name on Card" placeholder="Optional for Anonymity" required />
-            <Input label="Card Number" placeholder="•••• •••• •••• ••••" required type="text" />
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Expiry (MM/YY)" placeholder="12/25" required />
-              <Input label="CVC" placeholder="•••" required type="password" />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 bg-surface-tinted p-6 rounded-[24px] border border-neutral-200">
-            <h4 className="text-[14px] font-bold text-neutral-900 uppercase tracking-wide mb-2">Our Bank Details</h4>
-            <div className="space-y-3">
-              <div>
-                <p className="text-[11px] font-bold text-neutral-400 uppercase">Bank Name</p>
-                <p className="font-semibold text-neutral-800">Habib Bank Limited (HBL)</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-neutral-400 uppercase">Account Title</p>
-                <p className="font-semibold text-neutral-800">SHARE Mental Health Pvt.</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-neutral-400 uppercase">Account Number / IBAN</p>
-                <p className="font-mono font-bold text-primary select-all cursor-pointer" title="Click to copy">PK24 HABB 0001 2345 6789 0123</p>
-              </div>
-            </div>
-            <p className="text-[12px] font-medium text-neutral-500 pt-2 italic">
-              Please upload a screenshot of the receipt in the chat once connected.
-            </p>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 text-[12px] font-medium text-neutral-500 bg-surface-tinted/50 p-4 rounded-xl border border-neutral-100">
-          <Shield size={14} className="text-primary flex-shrink-0" />
-          Secure & Encrypted Processing. Your billing details are processed through industry-standard gateways.
+      {method === 'card' ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-neutral-700">Name on Card</span>
+            <input
+              className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
+              placeholder="Optional for anonymity"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-neutral-700">Card Number</span>
+            <input
+              className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
+              placeholder="4242 4242 4242 4242"
+            />
+          </label>
         </div>
+      ) : (
+        <div className="rounded-[24px] border border-neutral-200 bg-surface p-5 text-sm text-neutral-700">
+          <div className="mb-2 font-bold text-neutral-900">Our Bank Details</div>
+          <div className="space-y-1">
+            <div>Habib Bank Limited (HBL)</div>
+            <div>SHARE Mental Health Pvt.</div>
+            <div>PK24 HABB 0001 2345 6789 0123</div>
+          </div>
+        </div>
+      )}
 
-        <Button
-          type="submit"
-          loading={processing}
-          className="w-full py-4 !rounded-2xl font-bold transition-all shadow-float"
-        >
-          Confirm Payment & Connect
-        </Button>
-      </form>
-    </div>
+      <div className="flex items-start gap-2 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
+        <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <span>Secure and encrypted processing. Your billing details are processed through industry-standard gateways.</span>
+      </div>
+
+      <button
+        type="submit"
+        disabled={processing || !selectedSlot}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 text-sm font-bold text-white shadow-float-primary transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {processing ? (
+          <>
+            <Clock className="h-4 w-4 animate-spin" />
+            Securing your booking...
+          </>
+        ) : (
+          <>
+            <CreditCard className="h-4 w-4" />
+            Confirm Payment & Connect
+          </>
+        )}
+      </button>
+    </form>
   )
 }
 
@@ -302,40 +385,39 @@ export default function CheckoutModal({ isOpen, onClose, pro }) {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4 font-sans">
+      <motion.div
+        key="checkout-overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-neutral-950/40 p-4 backdrop-blur-sm"
+      >
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-text-main/20 backdrop-blur-sm"
-        />
-        
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-float z-10 overflow-hidden max-h-[90vh] flex flex-col"
+          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 18, scale: 0.98 }}
+          className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[32px] border border-neutral-200 bg-white shadow-2xl"
         >
-          {/* Close button - Fixed to top right */}
           <button
+            type="button"
             onClick={onClose}
-            className="absolute top-6 right-6 w-10 h-10 bg-surface-warm/80 backdrop-blur-sm rounded-full flex items-center justify-center text-text-muted hover:text-text-main transition-colors z-20"
+            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
           >
-            <X size={20} />
+            <X className="h-5 w-5" />
           </button>
-          
-          {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-            <h2 className="text-[28px] font-bold text-text-main tracking-tight mb-2 pr-10">Book Session</h2>
-            <p className="text-text-muted font-medium mb-8">Secure your appointment with {pro?.name}.</p>
-  
-            <Elements stripe={stripePromise}>
-              <CheckoutForm pro={pro} onClose={onClose} />
-            </Elements>
+
+          <div className="border-b border-neutral-200 px-8 py-7">
+            <h2 className="text-4xl font-bold text-neutral-900">Book Session</h2>
+            <p className="mt-2 text-neutral-600">
+              Secure your appointment with {pro?.name || 'this professional'}.
+            </p>
+          </div>
+
+          <div className="p-8">
+            <CheckoutForm pro={pro} onClose={onClose} />
           </div>
         </motion.div>
-      </div>
+      </motion.div>
     </AnimatePresence>
   )
 }

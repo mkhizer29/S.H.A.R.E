@@ -1,186 +1,239 @@
-import { collection, query, where, getDocs, getDoc, doc, Timestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  getDoc,
+  doc,
+  limit
+} from 'firebase/firestore'
+import { db } from '../lib/firebase'
+import { useAuthStore } from '../stores/authStore'
+
+const ACTIVE_BOOKING_STATUSES = new Set(['upcoming', 'confirmed', 'active', 'in_progress'])
+
+const looksLikeUid = (value) =>
+  typeof value === 'string' && value.length >= 20 && !value.includes(' ')
+
+const toDate = (value) => {
+  if (!value) return null
+  if (value instanceof Date) return value
+  if (typeof value?.toDate === 'function') return value.toDate()
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const getBookingDurationMinutes = (booking) =>
+  Number(booking.duration || booking.durationMinutes || 50)
+
+const normalizeName = (value) => (typeof value === 'string' ? value.trim() : '')
 
 /**
- * Resolves the real Firebase UID for a professional.
+ * Resolve the canonical Firebase Auth UID for a professional.
+ * We prefer explicit uid-style fields. If the directory only gives us
+ * a Firestore document id, we inspect that document for uid/userId/professionalId.
  */
 export const resolveProId = async (pro) => {
-  if (!pro) return null;
-  
-  // 1. Get candidate ID from common fields
-  const proId = pro.uid || pro.userId || (typeof pro === 'string' ? pro : pro.id);
-  
-  console.log("[resolveProId] Input:", pro?.name || pro, "Candidate ID:", proId);
+  if (!pro) return null
 
-  if (proId && typeof proId === 'string' && proId.length >= 20 && !proId.includes(' ')) {
-    return proId;
+  const directCandidates = [
+    pro?.uid,
+    pro?.userId,
+    pro?.professionalId,
+    pro?.ownerUid,
+    typeof pro === 'string' ? pro : pro?.id
+  ].filter(Boolean)
+
+  for (const candidate of directCandidates) {
+    if (looksLikeUid(candidate)) return candidate
   }
 
   try {
-    // 3. Try to fetch the professional document to see if it has a hidden uid/userId field
-    // Some docs might use the 'id' field to store a slug but have the real UID inside
-    if (proId && typeof proId === 'string') {
-      const proDoc = await getDoc(doc(db, 'professionals', proId));
+    const docCandidate = typeof pro === 'string' ? pro : pro?.id
+    if (docCandidate && typeof docCandidate === 'string') {
+      const proDoc = await getDoc(doc(db, 'professionals', docCandidate))
       if (proDoc.exists()) {
-        const data = proDoc.data();
-        if (data.uid) return data.uid;
-        if (data.userId) return data.userId;
+        const data = proDoc.data()
+        const resolved =
+          data.uid ||
+          data.userId ||
+          data.professionalId ||
+          (looksLikeUid(proDoc.id) ? proDoc.id : null)
+
+        if (resolved) return resolved
       }
     }
 
-    // 4. Fallback: Search users collection by name/alias
-    const searchName = pro.name || pro.alias || (typeof pro === 'string' ? pro : null);
+    const searchName =
+      normalizeName(pro?.name) ||
+      normalizeName(pro?.alias) ||
+      (typeof pro === 'string' ? normalizeName(pro) : '')
+
     if (searchName) {
-      console.log("[resolveProId] Falling back to name search for:", searchName);
-      // Try alias first
-      let userQuery = query(collection(db, 'users'), where('alias', '==', searchName));
-      let userSnap = await getDocs(userQuery);
-      
-      // If no alias match, try name
-      if (userSnap.empty) {
-        userQuery = query(collection(db, 'users'), where('name', '==', searchName));
-        userSnap = await getDocs(userQuery);
+      // Prioritize name query on professionals (public)
+      const professionalNameQuery = query(
+        collection(db, 'professionals'),
+        where('name', '==', searchName),
+        limit(1)
+      )
+      const professionalNameSnap = await getDocs(professionalNameQuery)
+
+      if (!professionalNameSnap.empty) {
+        const data = professionalNameSnap.docs[0].data()
+        const resolved = data.uid || data.userId || data.professionalId || (looksLikeUid(professionalNameSnap.docs[0].id) ? professionalNameSnap.docs[0].id : null)
+        if (resolved) return resolved
       }
 
-      if (!userSnap.empty) {
-        const foundId = userSnap.docs[0].id;
-        console.log("[resolveProId] Found UID via search:", foundId);
-        return foundId;
+      // Only attempt user lookup if authenticated and name query failed
+      const { user } = useAuthStore.getState()
+      if (user?.uid) {
+        try {
+          const userAliasQuery = query(collection(db, 'users'), where('alias', '==', searchName), limit(1))
+          const userAliasSnap = await getDocs(userAliasQuery)
+          if (!userAliasSnap.empty) return userAliasSnap.docs[0].id
+        } catch (e) {
+          console.warn('[resolveProId] User alias fallback failed:', e.message)
+        }
       }
     }
-  } catch (err) {
-    console.error("[resolveProId] Error:", err);
+  } catch (error) {
+    console.error('[resolveProId] Resolution failed:', error)
   }
-  
-  console.warn("[resolveProId] Could not resolve real UID, using candidate:", proId);
-  return proId;
-};
+
+  return null
+}
 
 export const getAvailableSlots = async (pro, daysCount = 14) => {
-  try {
-    const resolvedId = await resolveProId(pro);
-    if (!resolvedId) return [];
+  const resolvedId = await resolveProId(pro)
+  if (!resolvedId) {
+    throw new Error('Could not resolve the selected professional.')
+  }
 
-    console.log(`[getAvailableSlots] Starting check for ${resolvedId}. Days: ${daysCount}`);
+  const proId = resolvedId || (typeof pro === 'string' ? pro : pro?.id)
+  if (!proId) return []
 
-    // 1. Fetch Active Availability Rules for this professional
-    const availQuery = query(
-      collection(db, 'availability'), 
-      where('professionalId', '==', resolvedId),
-      where('isActive', '==', true)
-    );
-    const availSnap = await getDocs(availQuery);
-    const rules = availSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  // Fetch specifically for this professional to avoid permission/index issues
+  const availabilitySnap = await getDocs(
+    query(collection(db, 'availability'), where('professionalId', '==', proId))
+  )
+  const rules = availabilitySnap.docs
+    .map((snap) => ({
+      id: snap.id,
+      ...snap.data()
+    }))
+    .filter((rule) => rule.isActive !== false)
 
-    if (rules.length === 0) {
-      console.log("[getAvailableSlots] No availability rules found for:", resolvedId);
-      return [];
-    }
+  if (rules.length === 0) {
+    return []
+  }
 
-    // 2. Fetch Existing Bookings to exclude overlaps
-    const startOfRange = new Date();
-    startOfRange.setHours(0, 0, 0, 0);
-    const endOfRange = new Date(startOfRange);
-    endOfRange.setDate(endOfRange.getDate() + daysCount);
+  const now = new Date()
+  const rangeStart = new Date(now)
+  rangeStart.setHours(0, 0, 0, 0)
 
-    let bookings = [];
-    try {
-      const bookingsQuery = query(
-        collection(db, 'bookings'),
-        where('professionalId', '==', resolvedId), // FIXED: used resolvedId
-        where('status', '==', 'upcoming')
-      );
-      const bookingsSnap = await getDocs(bookingsQuery);
-      bookings = bookingsSnap.docs.map(doc => {
-        const data = doc.data();
-        let startsAt = data.startsAt;
-        if (startsAt && typeof startsAt.toDate === 'function') {
-          startsAt = startsAt.toDate();
-        } else {
-          startsAt = new Date(startsAt);
+  const rangeEnd = new Date(rangeStart)
+  rangeEnd.setDate(rangeEnd.getDate() + daysCount)
+
+  // Fetch specifically for this professional and status
+  const bookingsSnap = await getDocs(
+    query(collection(db, 'bookings'), where('professionalId', '==', proId))
+  )
+  const bookings = bookingsSnap.docs
+    .map((snap) => {
+      const data = snap.data()
+      const startsAt = toDate(data.startsAt)
+      if (!startsAt) return null
+
+      return {
+        id: snap.id,
+        ...data,
+        startsAt,
+        duration: getBookingDurationMinutes(data)
+      }
+    })
+    .filter(Boolean)
+    .filter((booking) => 
+      booking.professionalId === proId && 
+      ACTIVE_BOOKING_STATUSES.has(booking.status) &&
+      booking.startsAt >= rangeStart && 
+      booking.startsAt < rangeEnd
+    )
+
+  const days = []
+
+  for (let offset = 0; offset < daysCount; offset += 1) {
+    const currentDay = new Date(rangeStart)
+    currentDay.setDate(rangeStart.getDate() + offset)
+    currentDay.setHours(0, 0, 0, 0)
+
+    const currentDayOfWeek = currentDay.getDay()
+    const dayRules = rules
+      .filter((rule) => Number(rule.dayOfWeek) === currentDayOfWeek && rule.isActive)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+
+    const daySlots = []
+
+    for (const rule of dayRules) {
+      const [startHour, startMinute] = String(rule.startTime || '09:00')
+        .split(':')
+        .map(Number)
+      const [endHour, endMinute] = String(rule.endTime || '17:00')
+        .split(':')
+        .map(Number)
+
+      if (
+        Number.isNaN(startHour) ||
+        Number.isNaN(startMinute) ||
+        Number.isNaN(endHour) ||
+        Number.isNaN(endMinute)
+      ) {
+        continue
+      }
+
+      const slotDuration = Number(rule.slotDuration || 50)
+      const breakMinutes = Number(rule.breakMinutes || 10)
+
+      let slotStart = new Date(currentDay)
+      slotStart.setHours(startHour, startMinute, 0, 0)
+
+      const dayEnd = new Date(currentDay)
+      dayEnd.setHours(endHour, endMinute, 0, 0)
+
+      while (slotStart < dayEnd) {
+        const slotEnd = new Date(slotStart.getTime() + slotDuration * 60_000)
+
+        if (slotEnd > dayEnd) break
+
+        if (slotStart > now) {
+          const isBooked = bookings.some((booking) => {
+            const bookingStart = booking.startsAt.getTime()
+            const bookingEnd = bookingStart + booking.duration * 60_000
+            const slotStartMs = slotStart.getTime()
+            const slotEndMs = slotEnd.getTime()
+
+            return slotStartMs < bookingEnd && slotEndMs > bookingStart
+          })
+
+          daySlots.push({
+            startsAt: new Date(slotStart),
+            endsAt: new Date(slotEnd),
+            duration: slotDuration,
+            breakMinutes,
+            isBooked
+          })
         }
-        
-        return {
-          id: doc.id,
-          ...data,
-          startsAt
-        };
-      }).filter(b => b.startsAt >= startOfRange && b.startsAt <= endOfRange);
-      console.log(`[getAvailableSlots] Found ${bookings.length} upcoming bookings for ${resolvedId}`);
-    } catch (bookingErr) {
-      console.error("[getAvailableSlots] Booking fetch failed:", bookingErr);
-    }
 
-    // 3. Generate Slots
-    const days = [];
-    const now = new Date();
-
-    for (let i = 0; i < daysCount; i++) {
-      const currentDay = new Date();
-      currentDay.setDate(now.getDate() + i);
-      currentDay.setHours(0, 0, 0, 0);
-
-      const dayOfWeek = currentDay.getDay();
-      const dayRules = rules.filter(r => Number(r.dayOfWeek) === dayOfWeek);
-
-      const daySlots = [];
-
-      dayRules.forEach(rule => {
-        const [startH, startM] = rule.startTime.split(':').map(Number);
-        const [endH, endM] = rule.endTime.split(':').map(Number);
-        const slotDuration = rule.slotDuration || 50;
-        const breakMinutes = rule.breakMinutes || 10;
-
-        let slotStart = new Date(currentDay);
-        slotStart.setHours(startH, startM, 0, 0);
-
-        const dayEnd = new Date(currentDay);
-        dayEnd.setHours(endH, endM, 0, 0);
-
-        while (slotStart < dayEnd) {
-          const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
-          
-          if (slotEnd <= dayEnd) {
-            // Check if slot is in the future
-            if (slotStart > now) {
-              // Check for overlaps with existing bookings
-              const isBooked = bookings.some(b => {
-                const bStart = b.startsAt.getTime();
-                const bEnd = bStart + (b.duration || 50) * 60000;
-                const sStart = slotStart.getTime();
-                const sEnd = slotEnd.getTime();
-                
-                const overlaps = (sStart < bEnd && sEnd > bStart);
-                if (overlaps) {
-                  console.log(`[getAvailableSlots] Slot ${slotStart.toISOString()} is BOOKED by booking ${b.id}`);
-                }
-                return overlaps;
-              });
-
-              daySlots.push({
-                startsAt: new Date(slotStart),
-                endsAt: new Date(slotEnd),
-                duration: slotDuration,
-                isBooked: isBooked
-              });
-            }
-          }
-          // Move to next slot start (including break)
-          slotStart = new Date(slotEnd.getTime() + breakMinutes * 60000);
-        }
-      });
-
-      if (daySlots.length > 0) {
-        days.push({
-          date: currentDay,
-          slots: daySlots.sort((a, b) => a.startsAt - b.startsAt)
-        });
+        slotStart = new Date(slotEnd.getTime() + breakMinutes * 60_000)
       }
     }
 
-    return days;
-  } catch (error) {
-    console.error("[getAvailableSlots] Error:", error);
-    throw error;
+    if (daySlots.length > 0) {
+      days.push({
+        date: currentDay,
+        slots: daySlots.sort((a, b) => a.startsAt - b.startsAt)
+      })
+    }
   }
-};
+
+  return days
+}
