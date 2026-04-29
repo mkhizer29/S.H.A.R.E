@@ -260,23 +260,37 @@ const Calendar = () => {
                             };
                             const timeString = `${formatTime(startH, startM)} - ${formatTime(endH, endM)}`;
 
-                            return (
-                              <div
-                                key={avail.id || aIdx}
-                                className="absolute left-1 right-1 rounded-2xl z-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden border border-dashed border-primary/20"
-                                style={{ 
-                                  top: `${topRem}rem`, 
-                                  height: `${Math.max(heightRem, 1)}rem`,
-                                  background: 'rgba(139, 120, 230, 0.03)'
-                                }}
-                              >
-                                {heightRem >= 2 && (
-                                  <div className="flex flex-col items-center opacity-30">
-                                    <span className="text-[9px] font-bold text-primary/60 tracking-widest uppercase">{timeString}</span>
-                                  </div>
-                                )}
-                              </div>
-                            );
+                             // Check if this specific availability block is occupied by any session
+                             const isOccupied = daySessions.some(s => {
+                               const sStart = new Date(s.startsAt);
+                               const sEnd = new Date(sStart.getTime() + (s.durationMinutes || 50) * 60000);
+                               const aStart = new Date(day);
+                               aStart.setHours(startH, startM, 0, 0);
+                               const aEnd = new Date(day);
+                               aEnd.setHours(endH, endM, 0, 0);
+                               
+                               return (sStart < aEnd && sEnd > aStart);
+                             });
+
+                             return (
+                               <div
+                                 key={avail.id || aIdx}
+                                 className={`absolute left-1 right-1 rounded-2xl z-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden border border-dashed transition-opacity
+                                   ${isOccupied ? 'border-neutral-300 opacity-40 bg-neutral-100' : 'border-primary/20 bg-primary-light/5'}`}
+                                 style={{ 
+                                   top: `${topRem}rem`, 
+                                   height: `${Math.max(heightRem, 1)}rem`
+                                 }}
+                               >
+                                 {heightRem >= 2 && (
+                                   <div className="flex flex-col items-center opacity-30">
+                                     <span className="text-[9px] font-bold text-neutral-600 tracking-widest uppercase">
+                                       {isOccupied ? 'Occupied' : timeString}
+                                     </span>
+                                   </div>
+                                 )}
+                               </div>
+                             );
                           })}
 
                           {/* Current time indicator */}

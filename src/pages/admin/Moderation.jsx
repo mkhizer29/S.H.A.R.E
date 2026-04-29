@@ -37,9 +37,9 @@ const Moderation = () => {
               Search for a specific user to view their status or take action. The platform is currently clear of user reports.
             </p>
 
-            {/* Quick Actions (Demonstration purposes) */}
+            {/* Quick Actions */}
             <div className="mt-12 w-full max-w-2xl text-left">
-               <h4 className="text-sm font-medium text-text-muted uppercase tracking-wider mb-4 border-b border-sage-light pb-2">Common Actions Demo</h4>
+               <h4 className="text-sm font-medium text-text-muted uppercase tracking-wider mb-4 border-b border-sage-light pb-2">Common Actions</h4>
                <div className="grid sm:grid-cols-3 gap-4">
                   <div className="bg-white p-4 rounded-xl border border-sage-medium hover:border-brand-teal transition-colors cursor-pointer group">
                      <StopCircle className="w-5 h-5 text-yellow-600 mb-2 group-hover:scale-110 transition-transform" />

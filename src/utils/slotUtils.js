@@ -12,8 +12,7 @@ export const resolveProId = async (pro) => {
   
   console.log("[resolveProId] Input:", pro?.name || pro, "Candidate ID:", proId);
 
-  // 2. If it already looks like a real Firebase UID (long string, no spaces)
-  if (proId && typeof proId === 'string' && proId.length >= 20 && !proId.includes(' ') && proId !== 'demo-pro') {
+  if (proId && typeof proId === 'string' && proId.length >= 20 && !proId.includes(' ')) {
     return proId;
   }
 
@@ -54,7 +53,7 @@ export const resolveProId = async (pro) => {
   }
   
   console.warn("[resolveProId] Could not resolve real UID, using candidate:", proId);
-  return proId || 'demo-pro';
+  return proId;
 };
 
 export const getAvailableSlots = async (pro, daysCount = 14) => {

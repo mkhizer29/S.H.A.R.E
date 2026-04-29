@@ -5,35 +5,17 @@ import { Shield, User, Briefcase, Lock, ChevronRight, Zap, AlertCircle } from 'l
 import { useAuthStore } from '../../stores/authStore'
 import Input from '../../components/ui/Input'
 
-const DEMO_ACCOUNTS = [
-  { role: 'patient', label: 'Patient Portal', desc: 'Browse, chat, book sessions', color: 'border-violet-200 bg-lilac-50 text-violet-700 hover:border-violet-600', icon: User },
-  { role: 'professional', label: 'Professional Portal', desc: 'Inbox, calendar, revenue', color: 'border-sage-200 bg-sage-50 hover:border-sage-500 text-sage-600', icon: Briefcase },
-  { role: 'admin', label: 'Admin Terminal', desc: 'All 6 admin modules', color: 'border-plum-200 bg-plum-50 hover:border-plum-500 text-plum-600', icon: Lock },
-]
 
 export default function SignIn() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login, demoLogin, isLoading } = useAuthStore()
+  const { login, isLoading } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
   const from = location.state?.from?.pathname || null
 
-  const handleDemoLogin = async (role) => {
-    setError('')
-    try {
-      await demoLogin(role)
-      
-      // For demo logins, we always want to go to the specific dashboard the user requested
-      const state = useAuthStore.getState()
-      const target = state.role === 'patient' ? '/patient' : state.role === 'professional' ? '/pro' : '/admin'
-      navigate(target, { replace: true })
-    } catch (err) {
-      setError('Demo login failed. Please try again.')
-    }
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -50,7 +32,7 @@ export default function SignIn() {
       const target = from || (state.role === 'patient' ? '/patient' : state.role === 'professional' ? '/pro' : '/admin')
       navigate(target, { replace: true })
     } catch (err) {
-      setError(err.message || 'Invalid credentials. Please try a demo account.')
+      setError(err.message || 'Invalid credentials. Please try again.')
     }
   }
 
@@ -144,44 +126,8 @@ export default function SignIn() {
             </motion.button>
           </form>
 
-          {/* Demo divider */}
-          <div className="relative mb-8 mt-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-lilac-200" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-lilac-50 px-4 text-[11px] uppercase font-bold tracking-widest text-text-muted flex items-center gap-2">
-                <Zap size={12} className="text-sage-500" />
-                Quick Discovery Mode
-              </span>
-            </div>
-          </div>
-
-          {/* Demo accounts */}
-          <div className="grid grid-cols-1 gap-3">
-            {DEMO_ACCOUNTS.map((acc) => (
-              <motion.button
-                key={acc.role}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleDemoLogin(acc.role)}
-                disabled={isLoading}
-                className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all shadow-sm ${acc.color} ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}
-              >
-                <div className="w-10 h-10 bg-white/70 backdrop-blur rounded-[12px] flex items-center justify-center flex-shrink-0">
-                  <acc.icon size={20} />
-                </div>
-                <div className="text-left">
-                  <p className="text-[14px] font-bold tracking-tight">{acc.label}</p>
-                  <p className="text-[12px] font-medium opacity-70">Demo Access</p>
-                </div>
-                <ChevronRight size={16} className="ml-auto opacity-30" />
-              </motion.button>
-            ))}
-          </div>
-          
           <p className="text-center mt-8 text-[12px] text-text-muted font-medium px-4">
-            Note: This is a demo version. Real encrypted authentication requires a verified email address.
+            By signing in, you agree to our Terms of Service and Privacy Policy.
           </p>
         </motion.div>
       </div>

@@ -4,35 +4,6 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthState
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { generateKeyPair } from '../lib/crypto'
 
-const DEMO_USERS = {
-  patient: {
-    uid: 'patient-001',
-    alias: 'WillowDream',
-    email: 'patient@demo.com',
-    role: 'patient',
-    joinedAt: '2025-11-15',
-    avatar: null,
-    moodCheckedToday: false,
-  },
-  professional: {
-    uid: 'pro-001',
-    name: 'Dr. Aisha Raza',
-    email: 'pro@demo.com',
-    role: 'professional',
-    specialty: ['Anxiety', 'Depression', 'Trauma'],
-    verified: true,
-    avatar: null,
-    rating: 4.9,
-    sessionCount: 342,
-  },
-  admin: {
-    uid: 'admin-001',
-    name: 'Platform Admin',
-    email: 'admin@demo.com',
-    role: 'admin',
-    avatar: null,
-  },
-}
 
 export const useAuthStore = create((set) => ({
   user: null,
@@ -102,16 +73,6 @@ export const useAuthStore = create((set) => ({
     }
   },
 
-  demoLogin: async (role) => {
-    set({ isLoading: true })
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const user = DEMO_USERS[role] || DEMO_USERS['patient']
-        set({ user, role, isAuthenticated: true, isLoading: false })
-        resolve(user)
-      }, 600)
-    })
-  },
 
   register: async (email, password, alias, role) => {
     set({ isLoading: true })
