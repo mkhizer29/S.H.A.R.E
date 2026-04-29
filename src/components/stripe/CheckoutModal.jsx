@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Elements } from '@stripe/react-stripe-js'
 import { stripePromise } from '../../lib/stripe'
 import { db } from '../../lib/firebase'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, runTransaction } from 'firebase/firestore'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatStore } from '../../stores/chatStore'
 import { getAvailableSlots, resolveProId } from '../../utils/slotUtils'
@@ -73,7 +73,7 @@ function CheckoutForm({ pro, onClose }) {
       console.log('[Checkout] Re-checking slot availability for:', canonicalProId);
       const currentSlots = await getAvailableSlots(pro);
       const isStillAvailable = currentSlots.some(day => 
-        day.slots.some(slot => slot.startsAt.getTime() === selectedSlot.startsAt.getTime())
+        day.slots.some(slot => !slot.isBooked && slot.startsAt.getTime() === selectedSlot.startsAt.getTime())
       );
 
       if (!isStillAvailable) {
@@ -98,10 +98,28 @@ function CheckoutForm({ pro, onClose }) {
         createdAt: serverTimestamp()
       }
 
-      console.log('[Checkout] Creating real booking in Firestore:', bookingData);
+      console.log('[Checkout] Creating real booking in Firestore with collision check:', bookingData);
 
-      // 2. Write to Firestore
-      await addDoc(collection(db, 'bookings'), bookingData);
+      // 2. Write to Firestore with collision check
+      // We use a transaction to ensure atomicity
+      await runTransaction(db, async (transaction) => {
+        // Query for existing upcoming bookings for this professional at this exact time
+        const q = query(
+          collection(db, 'bookings'),
+          where('professionalId', '==', canonicalProId),
+          where('startsAt', '==', bookingData.startsAt),
+          where('status', '==', 'upcoming')
+        );
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+          throw new Error("Conflict: This slot was just confirmed for another patient.");
+        }
+
+        // Proceed to create booking
+        const newBookingRef = doc(collection(db, 'bookings'));
+        transaction.set(newBookingRef, bookingData);
+      });
 
       // 3. Ensure a conversation exists for the chat system
       await useChatStore.getState().ensureConversation(pro);

@@ -116,9 +116,9 @@ const Calendar = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* ─── Page Header ─── */}
-      <motion.div 
-        initial={{ opacity: 0, y: 16 }} 
-        animate={{ opacity: 1, y: 0 }} 
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         className="flex justify-between items-end mb-2 px-1"
       >
@@ -137,9 +137,9 @@ const Calendar = () => {
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-6">
         {/* ─── Main Weekly Grid ─── */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
           <div className="bg-surface rounded-[32px] border border-neutral-200 shadow-soft overflow-hidden">
@@ -148,7 +148,7 @@ const Calendar = () => {
               <div className="flex items-center gap-5">
                 <h2 className="text-xl font-bold text-neutral-900 tracking-tight">{headerTitle}</h2>
                 {weekOffset !== 0 && (
-                  <button 
+                  <button
                     onClick={() => setWeekOffset(0)}
                     className="text-[13px] font-bold text-primary bg-primary-light px-3 py-1 rounded-full hover:bg-primary-light/80 transition-colors"
                   >
@@ -157,19 +157,19 @@ const Calendar = () => {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <button 
+                <button
                   onClick={() => setWeekOffset(o => o - 1)}
                   className="w-10 h-10 flex items-center justify-center border border-neutral-200 rounded-xl text-neutral-500 hover:text-primary hover:border-primary-light hover:bg-primary-light transition-all"
                 >
                   <ChevronLeft size={20} />
                 </button>
-                <button 
+                <button
                   onClick={() => setWeekOffset(0)}
                   className="px-5 py-2 text-[14px] font-bold border border-neutral-200 rounded-xl text-neutral-700 hover:text-primary hover:border-primary-light hover:bg-primary-light transition-all"
                 >
                   Today
                 </button>
-                <button 
+                <button
                   onClick={() => setWeekOffset(o => o + 1)}
                   className="w-10 h-10 flex items-center justify-center border border-neutral-200 rounded-xl text-neutral-500 hover:text-primary hover:border-primary-light hover:bg-primary-light transition-all"
                 >
@@ -238,60 +238,88 @@ const Calendar = () => {
                             <div key={i} className="border-b border-dashed border-neutral-200/60" style={{ height: `${HOUR_HEIGHT_REM}rem` }} />
                           ))}
 
-                          {/* Render availability blocks (background) */}
-                          {dayAvailabilities.map((avail, aIdx) => {
-                            const [startH, startM] = avail.startTime.split(':').map(Number);
-                            const [endH, endM] = avail.endTime.split(':').map(Number);
-                            
-                            const startMin8 = (startH - GRID_START_HOUR) * 60 + startM;
-                            const endMin8 = (endH - GRID_START_HOUR) * 60 + endM;
-                            
-                            if (startMin8 < 0 || startH >= GRID_END_HOUR) return null;
+                          {/* Render availability blocks (background, split by sessions) */}
+                          {(() => {
+                            const freeSegments = [];
 
-                            const topRem = (startMin8 / 60) * HOUR_HEIGHT_REM;
-                            const durationMin = endMin8 - startMin8;
-                            const heightRem = (durationMin / 60) * HOUR_HEIGHT_REM;
+                            dayAvailabilities.forEach(avail => {
+                              const [startH, startM] = avail.startTime.split(':').map(Number);
+                              const [endH, endM] = avail.endTime.split(':').map(Number);
 
-                            const formatTime = (h, m) => {
-                              const period = h >= 12 ? 'PM' : 'AM';
-                              const hour12 = h % 12 || 12;
-                              const min = m < 10 ? `0${m}` : m;
-                              return `${hour12}:${min} ${period}`;
-                            };
-                            const timeString = `${formatTime(startH, startM)} - ${formatTime(endH, endM)}`;
+                              const aStart = new Date(day);
+                              aStart.setHours(startH, startM, 0, 0);
+                              const aEnd = new Date(day);
+                              aEnd.setHours(endH, endM, 0, 0);
 
-                             // Check if this specific availability block is occupied by any session
-                             const isOccupied = daySessions.some(s => {
-                               const sStart = new Date(s.startsAt);
-                               const sEnd = new Date(sStart.getTime() + (s.durationMinutes || 50) * 60000);
-                               const aStart = new Date(day);
-                               aStart.setHours(startH, startM, 0, 0);
-                               const aEnd = new Date(day);
-                               aEnd.setHours(endH, endM, 0, 0);
-                               
-                               return (sStart < aEnd && sEnd > aStart);
-                             });
+                              let segments = [{ start: aStart.getTime(), end: aEnd.getTime() }];
 
-                             return (
-                               <div
-                                 key={avail.id || aIdx}
-                                 className={`absolute left-1 right-1 rounded-2xl z-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden border border-dashed transition-opacity
-                                   ${isOccupied ? 'border-neutral-300 opacity-40 bg-neutral-100' : 'border-primary/20 bg-primary-light/5'}`}
-                                 style={{ 
-                                   top: `${topRem}rem`, 
-                                   height: `${Math.max(heightRem, 1)}rem`
-                                 }}
-                               >
-                                 {heightRem >= 2 && (
-                                   <div className="flex flex-col items-center opacity-30">
-                                     <span className="text-[9px] font-bold text-neutral-600 tracking-widest uppercase">
-                                       {isOccupied ? 'Occupied' : timeString}
-                                     </span>
-                                   </div>
-                                 )}
-                               </div>
-                             );
-                          })}
+                              daySessions.forEach(session => {
+                                if (session.status === 'cancelled') return;
+                                const sStart = new Date(session.startsAt).getTime();
+                                const sEnd = sStart + (session.durationMinutes || 50) * 60000;
+
+                                const nextSegments = [];
+                                segments.forEach(seg => {
+                                  // If session is completely outside segment
+                                  if (sEnd <= seg.start || sStart >= seg.end) {
+                                    nextSegments.push(seg);
+                                  } else {
+                                    // Split segment
+                                    if (sStart > seg.start) {
+                                      nextSegments.push({ start: seg.start, end: sStart });
+                                    }
+                                    if (sEnd < seg.end) {
+                                      nextSegments.push({ start: sEnd, end: seg.end });
+                                    }
+                                  }
+                                });
+                                segments = nextSegments;
+                              });
+
+                              segments.forEach(seg => {
+                                freeSegments.push({
+                                  ...avail,
+                                  segStart: new Date(seg.start),
+                                  segEnd: new Date(seg.end)
+                                });
+                              });
+                            });
+
+                            return freeSegments.map((seg, sIdx) => {
+                              const start = seg.segStart;
+                              const end = seg.segEnd;
+                              const startMin8 = (start.getHours() - GRID_START_HOUR) * 60 + start.getMinutes();
+                              const endMin8 = (end.getHours() - GRID_START_HOUR) * 60 + end.getMinutes();
+
+                              if (startMin8 < 0 || start.getHours() >= GRID_END_HOUR) return null;
+
+                              const topRem = (startMin8 / 60) * HOUR_HEIGHT_REM;
+                              const durationMin = Math.max(endMin8 - startMin8, 0);
+                              const heightRem = (durationMin / 60) * HOUR_HEIGHT_REM;
+
+                              if (heightRem < 0.2) return null;
+
+                              const timeString = `${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+
+                              return (
+                                <div
+                                  key={`${seg.id}-${sIdx}`}
+                                  className="absolute left-0.5 right-0.5 rounded-2xl z-0 pointer-events-none flex flex-col items-center justify-center overflow-hidden border border-primary/10 bg-primary-light/10 backdrop-blur-[2px] transition-all"
+                                  style={{
+                                    top: `${topRem}rem`,
+                                    height: `${heightRem}rem`
+                                  }}
+                                >
+                                  {heightRem >= 1.2 && (
+                                    <div className="flex flex-col items-center opacity-40 transition-opacity">
+                                      <span className="text-[8px] font-black text-primary tracking-widest uppercase mb-0.5">Available</span>
+                                      <span className="text-[9px] font-bold text-primary/70">{timeString}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            });
+                          })()}
 
                           {/* Current time indicator */}
                           {isToday && (() => {
@@ -314,7 +342,7 @@ const Calendar = () => {
                             const hour = start.getHours();
                             const minute = start.getMinutes();
                             const minutesSince8 = (hour - GRID_START_HOUR) * 60 + minute;
-                            
+
                             // Skip sessions outside grid range
                             if (minutesSince8 < 0 || hour >= GRID_END_HOUR) return null;
 
@@ -327,8 +355,8 @@ const Calendar = () => {
                               <div
                                 key={session.id || eIdx}
                                 className={`absolute left-1.5 right-1.5 rounded-2xl shadow-float z-10 transition-all cursor-pointer border group
-                                  ${isCancelled 
-                                    ? 'bg-neutral-100 border-neutral-200 opacity-50' 
+                                  ${isCancelled
+                                    ? 'bg-neutral-100 border-neutral-200 opacity-50'
                                     : 'bg-primary text-white border-primary-hover border-b-2 hover:-translate-y-0.5 hover:shadow-lg'
                                   }`}
                                 style={{ top: `${topRem}rem`, height: `${Math.max(heightRem, 3)}rem` }}
@@ -364,9 +392,9 @@ const Calendar = () => {
         {/* ─── Right Sidebar ─── */}
         <div className="space-y-6">
           {/* Today's Sessions Detail */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.2 }}
           >
             <Card hover={false} className="p-6">
@@ -418,9 +446,9 @@ const Calendar = () => {
           </motion.div>
 
           {/* Availability */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.3 }}
           >
             <Card hover={false} className="p-6 relative overflow-hidden group">
@@ -450,9 +478,9 @@ const Calendar = () => {
       </div>
 
       {/* Manage Availability Modal */}
-      <ManageAvailabilityModal 
-        isOpen={isManageModalOpen} 
-        onClose={() => setIsManageModalOpen(false)} 
+      <ManageAvailabilityModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
         availabilities={availabilities}
         onAdd={addAvailability}
         onDelete={deleteAvailability}
@@ -494,9 +522,9 @@ const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDel
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1A1A]/40 backdrop-blur-sm p-4">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }} 
-        animate={{ opacity: 1, scale: 1 }} 
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
         className="bg-surface rounded-3xl shadow-float max-w-lg w-full overflow-hidden border border-neutral-200"
       >
         <div className="px-6 py-5 border-b border-neutral-200 bg-surface-tinted flex justify-between items-center">
@@ -515,8 +543,8 @@ const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDel
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase">Day of Week</label>
-                <select 
-                  value={dayOfWeek} 
+                <select
+                  value={dayOfWeek}
                   onChange={(e) => setDayOfWeek(e.target.value)}
                   className="w-full bg-surface border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 >
@@ -527,9 +555,9 @@ const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDel
               </div>
               <div>
                 <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase">Start Time</label>
-                <input 
-                  type="time" 
-                  value={startTime} 
+                <input
+                  type="time"
+                  value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
                   required
                   className="w-full bg-surface border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
@@ -537,9 +565,9 @@ const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDel
               </div>
               <div>
                 <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase">End Time</label>
-                <input 
-                  type="time" 
-                  value={endTime} 
+                <input
+                  type="time"
+                  value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
                   required
                   className="w-full bg-surface border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
@@ -547,11 +575,11 @@ const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDel
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-bold text-neutral-500 mb-1.5 uppercase">Slot Duration (mins)</label>
-                <input 
-                  type="number" 
-                  min="15" 
+                <input
+                  type="number"
+                  min="15"
                   step="5"
-                  value={slotDuration} 
+                  value={slotDuration}
                   onChange={(e) => setSlotDuration(e.target.value)}
                   required
                   className="w-full bg-surface border border-neutral-200 rounded-xl px-4 py-2.5 text-sm font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
@@ -563,28 +591,38 @@ const ManageAvailabilityModal = ({ isOpen, onClose, availabilities, onAdd, onDel
             </Button>
           </form>
 
-          <div>
-            <h3 className="text-sm font-bold text-neutral-900 tracking-wider uppercase mb-3">Current Rules</h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <Clock size={16} className="text-primary" />
+              <h3 className="text-sm font-bold text-neutral-900 tracking-wider uppercase">Weekly Schedule</h3>
+            </div>
             {availabilities.length === 0 ? (
-              <p className="text-sm font-medium text-neutral-500 text-center py-4">No availability rules set yet.</p>
+              <div className="text-center py-8 bg-surface-tinted rounded-2xl border border-dashed border-neutral-200">
+                <p className="text-sm font-medium text-neutral-500">No availability rules set yet.</p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {availabilities.sort((a, b) => a.dayOfWeek - b.dayOfWeek).map((avail) => (
-                  <div key={avail.id} className="flex items-center justify-between p-3.5 bg-surface border border-neutral-200 rounded-xl hover:border-primary-light transition-colors">
-                    <div>
-                      <p className="text-[14px] font-bold text-neutral-900">
-                        {DAY_LABELS[avail.dayOfWeek]} <span className="text-neutral-400 font-medium">·</span> {avail.startTime} - {avail.endTime}
-                      </p>
-                      <p className="text-[12px] font-medium text-neutral-500 mt-0.5">
-                        {avail.slotDuration}m slots · {avail.breakMinutes}m break
-                      </p>
+                  <div key={avail.id} className="group flex items-center justify-between p-4 bg-surface border border-neutral-200 rounded-2xl hover:border-primary/30 hover:shadow-sm transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-primary-light/30 flex items-center justify-center text-primary font-bold text-xs">
+                        {DAY_LABELS[avail.dayOfWeek]?.substring(0, 3)}
+                      </div>
+                      <div>
+                        <p className="text-[14px] font-bold text-neutral-900">
+                          {avail.startTime} - {avail.endTime}
+                        </p>
+                        <p className="text-[12px] font-medium text-neutral-500">
+                          {avail.slotDuration}m sessions · {avail.breakMinutes}m break
+                        </p>
+                      </div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => onDelete(avail.id)}
-                      className="p-2 text-neutral-400 hover:text-alert-coral hover:bg-alert-coral-light/50 rounded-lg transition-all"
+                      className="p-2.5 text-neutral-400 hover:text-alert hover:bg-alert/5 rounded-xl transition-all"
                       title="Delete Rule"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 ))}
