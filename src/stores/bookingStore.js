@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { db } from '../lib/firebase'
-import { collection, query, where, getDocs, orderBy, doc, updateDoc, onSnapshot } from 'firebase/firestore'
+import { collection, query, where, getDocs, getDoc, orderBy, doc, updateDoc, onSnapshot } from 'firebase/firestore'
+import { createNotification } from './notificationStore'
+import { useAuthStore } from './authStore'
 
 // Remove mock SESSIONS data
 
@@ -52,7 +54,30 @@ export const useBookingStore = create((set, get) => ({
 
   cancelSession: async (id) => {
     try {
-      await updateDoc(doc(db, 'bookings', id), { status: 'cancelled' });
+      const { user } = useAuthStore.getState();
+      const bookingRef = doc(db, 'bookings', id);
+      const snap = await getDoc(bookingRef);
+      
+      if (!snap.exists()) return;
+      const bookingData = snap.data();
+
+      await updateDoc(bookingRef, { status: 'cancelled' });
+
+      // Notify the other party
+      const recipientId = user.uid === bookingData.patientId ? bookingData.professionalId : bookingData.patientId;
+      const recipientRole = user.uid === bookingData.patientId ? 'professional' : 'patient';
+      
+      await createNotification({
+        userId: recipientId,
+        actorId: user.uid,
+        actorName: user.alias || user.name || 'Someone',
+        type: 'booking',
+        entityType: 'booking',
+        entityId: id,
+        title: 'Session Cancelled',
+        body: `The session on ${new Date(bookingData.startsAt).toLocaleDateString()} has been cancelled by ${user.alias || user.name}.`,
+        link: recipientRole === 'professional' ? '/pro/calendar' : '/patient/bookings'
+      });
     } catch (error) {
       console.error("[BookingStore] Cancel error:", error);
     }

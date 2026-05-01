@@ -17,6 +17,7 @@ import {
   writeBatch
 } from 'firebase/firestore'
 import { useAuthStore } from './authStore'
+import { createNotification } from './notificationStore'
 
 export const useChatStore = create((set, get) => ({
   conversations: [],
@@ -131,6 +132,23 @@ export const useChatStore = create((set, get) => ({
       });
 
       await batch.commit();
+
+      // 3. Create Notification for the recipient
+      const recipientId = user.uid === activeConv.patientUid ? activeConv.proUid : activeConv.patientUid;
+      const recipientRole = user.uid === activeConv.patientUid ? 'professional' : 'patient';
+      const link = recipientRole === 'professional' ? `/pro/inbox` : `/patient/chat/${activeConvId}`;
+
+      await createNotification({
+        userId: recipientId,
+        actorId: user.uid,
+        actorName: user.alias || user.name || 'Anonymous',
+        type: 'message',
+        entityType: 'conversation',
+        entityId: activeConvId,
+        title: 'New Message',
+        body: text.length > 60 ? `${text.substring(0, 60)}...` : text,
+        link
+      });
     } catch (error) {
       console.error("[ChatStore] Send message error:", error);
     }

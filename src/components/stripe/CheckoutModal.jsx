@@ -23,6 +23,7 @@ import { db } from '../../lib/firebase'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatStore } from '../../stores/chatStore'
 import { getAvailableSlots, resolveProId } from '../../utils/slotUtils'
+import { createNotification } from '../../stores/notificationStore'
 
 const ACTIVE_BOOKING_STATUSES = new Set(['upcoming', 'confirmed', 'active', 'in_progress'])
 
@@ -166,10 +167,6 @@ function CheckoutForm({ pro, onClose }) {
           }
         }
 
-        // Note: We don't need a collisionQuery here because the bookingId 
-        // is deterministic (professionalId + startsAt). If another booking 
-        // exists for this exact slot, existingBooking.exists() will be true.
-
         transaction.set(bookingRef, bookingData)
       })
 
@@ -179,6 +176,37 @@ function CheckoutForm({ pro, onClose }) {
           .ensureConversation({ ...pro, uid: canonicalProId, professionalId: canonicalProId })
       } catch (conversationError) {
         console.error('[CheckoutModal] Conversation bootstrap failed:', conversationError)
+      }
+
+      // 3. Create Notifications
+      try {
+        // Notification for Professional
+        await createNotification({
+          userId: canonicalProId,
+          actorId: user.uid,
+          actorName: user.alias || user.name || 'Anonymous',
+          type: 'booking',
+          entityType: 'booking',
+          entityId: bookingId,
+          title: 'New Session Request',
+          body: `You have a new session scheduled with ${user.alias || user.name} on ${new Date(selectedSlot.startsAt).toLocaleDateString()}.`,
+          link: '/pro/calendar'
+        });
+
+        // Notification for Patient
+        await createNotification({
+          userId: user.uid,
+          actorId: canonicalProId,
+          actorName: pro?.name || 'Specialist',
+          type: 'booking',
+          entityType: 'booking',
+          entityId: bookingId,
+          title: 'Booking Confirmed',
+          body: `Your session with ${pro?.name} is confirmed for ${new Date(selectedSlot.startsAt).toLocaleString()}.`,
+          link: '/patient/bookings'
+        });
+      } catch (notifError) {
+        console.error('[CheckoutModal] Notification failed:', notifError)
       }
 
       setSuccess(true)
