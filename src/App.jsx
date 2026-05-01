@@ -28,6 +28,7 @@ import Calendar from './pages/professional/Calendar';
 import Clients from './pages/professional/Clients';
 import Revenue from './pages/professional/Revenue';
 import Profile from './pages/professional/Profile';
+import ManageSchedule from './pages/professional/ManageSchedule';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -131,6 +132,7 @@ function App() {
           <Route path="calendar" element={<Calendar />} />
           <Route path="clients" element={<Clients />} />
           <Route path="revenue" element={<Revenue />} />
+          <Route path="manage-schedule" element={<ManageSchedule />} />
           <Route path="profile" element={<Profile />} />
           <Route path="session/:id" element={<LiveSession />} />
         </Route>

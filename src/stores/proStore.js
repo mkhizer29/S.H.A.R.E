@@ -119,5 +119,33 @@ export const useProStore = create((set) => ({
       set({ error: error.message, isLoading: false })
       return false
     }
+  },
+
+  saveCaseNote: async (proId, patientId, content) => {
+    try {
+      const noteRef = doc(db, 'professionals', proId, 'notes', patientId);
+      await setDoc(noteRef, {
+        content,
+        updatedAt: new Date().toISOString()
+      });
+      return true;
+    } catch (error) {
+      console.error('Error saving case note:', error);
+      return false;
+    }
+  },
+
+  fetchCaseNote: async (proId, patientId) => {
+    try {
+      const noteRef = doc(db, 'professionals', proId, 'notes', patientId);
+      const docSnap = await getDoc(noteRef);
+      if (docSnap.exists()) {
+        return docSnap.data().content;
+      }
+      return '';
+    } catch (error) {
+      console.error('Error fetching case note:', error);
+      return '';
+    }
   }
-}))
+}) )

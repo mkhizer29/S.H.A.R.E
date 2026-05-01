@@ -18,7 +18,16 @@ export const useAuthStore = create((set) => ({
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            const userData = userDoc.data();
+            let userData = userDoc.data();
+            
+            // Sync verification status for professionals
+            if (userData.role === 'professional') {
+              const proDoc = await getDoc(doc(db, 'professionals', firebaseUser.uid));
+              if (proDoc.exists()) {
+                userData = { ...userData, ...proDoc.data() };
+              }
+            }
+
             set({ 
               user: { uid: firebaseUser.uid, email: firebaseUser.email, ...userData },
               role: userData.role,
@@ -51,7 +60,16 @@ export const useAuthStore = create((set) => ({
       const userDoc = await getDoc(doc(db, 'users', uid));
       
       if (userDoc.exists()) {
-        const userData = userDoc.data();
+        let userData = userDoc.data();
+        
+        // Sync verification status for professionals
+        if (userData.role === 'professional') {
+          const proDoc = await getDoc(doc(db, 'professionals', uid));
+          if (proDoc.exists()) {
+            userData = { ...userData, ...proDoc.data() };
+          }
+        }
+
         const user = { uid, email, ...userData };
         set({ 
           user, 

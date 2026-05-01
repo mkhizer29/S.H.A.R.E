@@ -20,6 +20,7 @@ const NAV_ITEMS = {
     { to: '/pro', icon: Home, label: 'Dashboard', end: true },
     { to: '/pro/inbox', icon: MessageSquare, label: 'Inbox' },
     { to: '/pro/calendar', icon: Calendar, label: 'Calendar' },
+    { to: '/pro/manage-schedule', icon: CheckSquare, label: 'Schedule' },
     { to: '/pro/clients', icon: Users, label: 'Clients' },
     { to: '/pro/revenue', icon: Banknote, label: 'Revenue' },
     { to: '/pro/profile', icon: User, label: 'Profile' },
@@ -66,7 +67,7 @@ export default function Sidebar() {
             to={item.to}
             end={item.end}
             className={({ isActive }) => `flex items-center gap-3.5 px-4 py-3.5 rounded-[16px] text-[15px] font-medium transition-all group ${isActive
-                ? 'bg-primary-light text-primary shadow-inner-soft'
+                ? 'bg-primary-light text-primary shadow-soft border border-primary-light'
                 : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'
               }`}
           >

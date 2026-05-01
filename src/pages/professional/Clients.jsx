@@ -1,33 +1,33 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, MoreHorizontal, FileText, MessageSquare, Users, Loader2 } from 'lucide-react';
+import { Search, MoreHorizontal, FileText, MessageSquare, Users, Loader2, X, Shield, Clock } from 'lucide-react';
 import Avatar from '../../components/ui/Avatar';
 import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useBookingStore } from '../../stores/bookingStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useProStore } from '../../stores/proStore';
 
 const Clients = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { sessions, loadBookings, isLoading: loadingSessions } = useBookingStore();
   const { conversations, fetchConversations, isLoading: loadingConvs, setActiveConv } = useChatStore();
+  const { updateProProfile, fetchCaseNote, saveCaseNote } = useProStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [noteContent, setNoteContent] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [isLoadingNote, setIsLoadingNote] = useState(false);
+
   useEffect(() => {
     if (user?.uid) {
       loadBookings(user.uid, 'professional');
       fetchConversations(user.uid, 'pro');
     }
   }, [user?.uid, loadBookings, fetchConversations]);
-
-  const handleMessageClient = (clientId) => {
-    // Find conversation for this client
-    const conv = conversations.find(c => c.patientUid === clientId);
-    if (conv) {
-      setActiveConv(conv.id);
-      navigate('/pro/inbox');
-    }
-  };
 
   const clients = useMemo(() => {
     const roster = {};
@@ -69,17 +69,17 @@ const Clients = () => {
         roster[uid].sessions += 1;
       }
 
-      // Update last active if session is newer
+      // Update last active if session is newer (ONLY if in the past)
       const sessionDate = new Date(session.startsAt);
-      if (sessionDate > roster[uid].lastActive) {
+      if (sessionDate <= now && sessionDate > roster[uid].lastActive) {
         roster[uid].lastActive = sessionDate;
       }
-
+      
       // Update next session if in future
       if (session.status === 'upcoming' && sessionDate > now) {
         if (!roster[uid].nextSession || sessionDate < new Date(roster[uid].nextSession)) {
           roster[uid].nextSession = session.startsAt;
-          roster[uid].status = 'Active';
+          roster[uid].status = 'Upcoming Session';
         }
       }
     });
@@ -89,6 +89,46 @@ const Clients = () => {
     if (!searchQuery) return list;
     return list.filter(c => c.alias.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [sessions, conversations, searchQuery]);
+
+  const handleMessageClient = (clientId) => {
+    // Find conversation for this client
+    const conv = conversations.find(c => c.patientUid === clientId);
+    if (conv) {
+      setActiveConv(conv.id);
+      navigate('/pro/inbox');
+    }
+  };
+
+  // Fetch note when client is selected
+  useEffect(() => {
+    if (showNoteModal && selectedClient && user?.uid) {
+      setIsLoadingNote(true);
+      fetchCaseNote(user.uid, selectedClient.id).then(content => {
+        setNoteContent(content);
+        setIsLoadingNote(false);
+      });
+    }
+  }, [showNoteModal, selectedClient, user?.uid, fetchCaseNote]);
+
+  const handleSaveNote = async () => {
+    if (!user?.uid || !selectedClient) return;
+    setIsSavingNote(true);
+    const success = await saveCaseNote(user.uid, selectedClient.id, noteContent);
+    setIsSavingNote(false);
+    if (success) {
+      setShowNoteModal(false);
+    }
+  };
+
+  // Sync client count to database
+  useEffect(() => {
+    if (user?.uid && clients.length > 0) {
+      const currentCount = user.clientCount || 0;
+      if (currentCount !== clients.length) {
+        updateProProfile(user.uid, { clientCount: clients.length });
+      }
+    }
+  }, [user?.uid, clients.length, user?.clientCount, updateProProfile]);
 
   const formatLastActive = (date) => {
     if (!date || date.getTime() === 0) return 'Just connected';
@@ -159,6 +199,7 @@ const Clients = () => {
                     <td className="px-6 py-5">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wide ${
                         client.status === 'Active' ? 'bg-[#E6EFEA] text-[#6DA398] border border-[#6DA398]/30' :
+                        client.status === 'Upcoming Session' ? 'bg-primary-light/50 text-primary border border-primary-light' :
                         'bg-surface-tinted text-neutral-500 border border-neutral-200'
                       }`}>
                         {client.status}
@@ -188,10 +229,20 @@ const Clients = () => {
                         >
                           <MessageSquare size={18} />
                         </button>
-                        <button className="p-2.5 text-neutral-400 hover:text-primary hover:bg-primary-light transition-colors rounded-xl border border-transparent hover:border-primary-light" title="Secure Notes">
+                        <button 
+                          onClick={() => {
+                            setSelectedClient(client);
+                            setShowNoteModal(true);
+                          }}
+                          className="p-2.5 text-neutral-400 hover:text-primary hover:bg-primary-light transition-colors rounded-xl border border-transparent hover:border-primary-light" 
+                          title="Secure Notes"
+                        >
                           <FileText size={18} />
                         </button>
-                        <button className="p-2.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-200 transition-colors rounded-xl">
+                        <button 
+                          onClick={() => alert('Client details coming soon.')}
+                          className="p-2.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-200 transition-colors rounded-xl"
+                        >
                           <MoreHorizontal size={18} />
                         </button>
                       </div>
@@ -200,6 +251,74 @@ const Clients = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* Secure Notes Modal */}
+      {showNoteModal && selectedClient && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-neutral-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] w-full max-w-lg overflow-hidden shadow-float animate-in zoom-in-95 duration-200">
+            <div className="p-8 pb-0 flex justify-between items-start">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center text-primary">
+                  <Shield size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-neutral-900 tracking-tight">Secure Case Notes</h3>
+                  <p className="text-[14px] font-medium text-neutral-500">Drafting notes for {selectedClient.alias}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowNoteModal(false)}
+                className="p-2 hover:bg-neutral-100 rounded-xl transition-colors text-neutral-400 hover:text-neutral-900"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="bg-surface-tinted p-5 rounded-2xl border border-neutral-100 space-y-3">
+                 <div className="flex items-center gap-2 text-[12px] font-bold text-neutral-400 uppercase tracking-wider">
+                    <Clock size={14} /> Last Session: {selectedClient.lastActive.toLocaleDateString()}
+                 </div>
+                 <p className="text-[14px] text-neutral-600 leading-relaxed font-medium">
+                   These notes are encrypted and only accessible by you. Patient will not be notified of these updates.
+                 </p>
+              </div>
+
+              {isLoadingNote ? (
+                <div className="py-12 flex flex-col items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+                  <p className="text-neutral-400 text-sm font-medium">Retrieving secure notes...</p>
+                </div>
+              ) : (
+                <textarea 
+                  placeholder="Start typing clinical notes..."
+                  rows="6"
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  className="w-full bg-surface border-2 border-neutral-100 rounded-2xl py-4 px-5 text-[15px] font-medium focus:outline-none focus:border-primary transition-all resize-none shadow-inner-soft"
+                ></textarea>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  fullWidth 
+                  onClick={handleSaveNote}
+                  loading={isSavingNote}
+                  className="!rounded-2xl"
+                >
+                  Save Secure Note
+                </Button>
+                <button 
+                  onClick={() => setShowNoteModal(false)}
+                  disabled={isSavingNote}
+                  className="px-6 py-3 rounded-2xl font-bold text-neutral-500 hover:bg-neutral-100 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

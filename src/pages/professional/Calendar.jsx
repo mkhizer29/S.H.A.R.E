@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Calendar as CalendarIcon,
@@ -156,13 +157,11 @@ const Calendar = () => {
   const {
     availabilities,
     loadAvailability,
-    addAvailability,
-    deleteAvailability,
     isLoading: availabilityLoading
   } = useAvailabilityStore()
 
+  const navigate = useNavigate()
   const [weekOffset, setWeekOffset] = useState(0)
-  const [isManageModalOpen, setIsManageModalOpen] = useState(false)
 
   useEffect(() => {
     if (!user?.uid) return
@@ -549,7 +548,7 @@ const Calendar = () => {
 
               <button
                 type="button"
-                onClick={() => setIsManageModalOpen(true)}
+                onClick={() => navigate('/pro/manage-schedule')}
                 className="mt-5 flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-4 text-sm font-bold text-white shadow-float-primary transition hover:opacity-95"
               >
                 Manage Schedule
@@ -558,214 +557,7 @@ const Calendar = () => {
           </motion.div>
         </div>
       </div>
-
-      <ManageAvailabilityModal
-        isOpen={isManageModalOpen}
-        onClose={() => setIsManageModalOpen(false)}
-        availabilities={availabilities}
-        onAdd={addAvailability}
-        onDelete={deleteAvailability}
-        professionalId={user?.uid}
-      />
     </>
-  )
-}
-
-const ManageAvailabilityModal = ({
-  isOpen,
-  onClose,
-  availabilities,
-  onAdd,
-  onDelete,
-  professionalId
-}) => {
-  const [dayOfWeek, setDayOfWeek] = useState(1)
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('17:00')
-  const [slotDuration, setSlotDuration] = useState(50)
-  const [breakMinutes, setBreakMinutes] = useState(10)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  if (!isOpen) return null
-
-  const handleAdd = async (e) => {
-    e.preventDefault()
-
-    if (!professionalId) return
-
-    if (startTime >= endTime) {
-      alert('End time must be after start time.')
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      await onAdd({
-        professionalId,
-        dayOfWeek: Number(dayOfWeek),
-        startTime,
-        endTime,
-        slotDuration: Number(slotDuration),
-        breakMinutes: Number(breakMinutes),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        isActive: true
-      })
-
-      setStartTime('09:00')
-      setEndTime('17:00')
-      setSlotDuration(50)
-      setBreakMinutes(10)
-    } catch (error) {
-      console.error(error)
-      alert('Could not save this availability rule. Please try again.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const sortedAvailabilities = [...availabilities].sort((a, b) => {
-    if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek
-    return String(a.startTime).localeCompare(String(b.startTime))
-  })
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-950/45 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[32px] border border-neutral-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-neutral-200 px-7 py-6">
-          <div>
-            <h2 className="text-3xl font-bold text-neutral-900">Manage Availability</h2>
-            <p className="mt-1 text-neutral-500">Define your weekly recurring schedule</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
-          >
-            <Trash2 className="h-5 w-5 rotate-45" />
-          </button>
-        </div>
-
-        <div className="space-y-8 p-7">
-          <form onSubmit={handleAdd} className="rounded-[28px] border border-neutral-200 p-5">
-            <h3 className="mb-4 text-lg font-bold text-neutral-900">Add New Rule</h3>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-neutral-700">Day of Week</span>
-                <select
-                  value={dayOfWeek}
-                  onChange={(e) => setDayOfWeek(e.target.value)}
-                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
-                >
-                  {DAY_LABELS.map((day, index) => (
-                    <option key={day} value={index}>
-                      {day}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-neutral-700">Slot Duration (mins)</span>
-                <input
-                  type="number"
-                  min="15"
-                  max="180"
-                  value={slotDuration}
-                  onChange={(e) => setSlotDuration(e.target.value)}
-                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-neutral-700">Start Time</span>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-neutral-700">End Time</span>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
-                />
-              </label>
-
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-sm font-semibold text-neutral-700">Break (mins)</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="120"
-                  value={breakMinutes}
-                  onChange={(e) => setBreakMinutes(e.target.value)}
-                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
-                />
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="mt-5 flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-4 text-sm font-bold text-white shadow-float-primary transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSubmitting ? 'Adding…' : 'Add Rule'}
-            </button>
-          </form>
-
-          <div>
-            <div className="mb-4 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              <h3 className="text-lg font-bold text-neutral-900">Weekly Schedule</h3>
-            </div>
-
-            {sortedAvailabilities.length === 0 ? (
-              <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-6 text-center text-neutral-500">
-                No availability rules set yet.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sortedAvailabilities.map((availability) => (
-                  <div
-                    key={availability.id}
-                    className="flex items-center justify-between rounded-[24px] border border-neutral-200 p-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-light/20 text-sm font-bold text-primary">
-                        {DAY_LABELS[availability.dayOfWeek]?.slice(0, 3)}
-                      </div>
-                      <div>
-                        <div className="font-bold text-neutral-900">
-                          {availability.startTime} - {availability.endTime}
-                        </div>
-                        <div className="mt-1 text-sm text-neutral-500">
-                          {availability.slotDuration}m sessions · {availability.breakMinutes}m break
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => onDelete(availability.id)}
-                      className="rounded-xl p-2 text-neutral-400 transition hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }
 

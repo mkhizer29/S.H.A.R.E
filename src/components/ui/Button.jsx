@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
+import { Loader2 } from 'lucide-react'
 
-export default function Button({ children, variant = 'primary', size = 'md', onClick, disabled, className = '', type = 'button', icon }) {
+export default function Button({ children, variant = 'primary', size = 'md', onClick, disabled, className = '', type = 'button', icon, loading }) {
   const sizes = {
     sm: 'px-4 py-2 text-sm rounded-xl',
     md: 'px-6 py-3 text-[15px] font-medium rounded-2xl',
@@ -17,17 +18,25 @@ export default function Button({ children, variant = 'primary', size = 'md', onC
     dangerGhost: 'text-alert hover:bg-alert-light',
   }
 
+  const isDisabled = disabled || loading
+
   return (
     <motion.button
       type={type}
       onClick={onClick}
-      disabled={disabled}
-      whileHover={{ scale: disabled ? 1 : 1.02 }}
-      whileTap={{ scale: disabled ? 1 : 0.97 }}
-      className={`inline-flex items-center justify-center gap-2 transition-all ${sizes[size]} ${variants[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      disabled={isDisabled}
+      whileHover={{ scale: isDisabled ? 1 : 1.02 }}
+      whileTap={{ scale: isDisabled ? 1 : 0.97 }}
+      className={`inline-flex items-center justify-center gap-2 transition-all ${sizes[size]} ${variants[variant]} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
     >
-      {icon && <span className="w-[18px] h-[18px] flex-shrink-0 flex items-center justify-center">{icon}</span>}
-      {children}
+      {loading ? (
+        <Loader2 className="w-5 h-5 animate-spin" />
+      ) : (
+        <>
+          {icon && <span className="w-[18px] h-[18px] flex-shrink-0 flex items-center justify-center">{icon}</span>}
+          {children}
+        </>
+      )}
     </motion.button>
   )
 }

@@ -166,17 +166,11 @@ const Profile = () => {
             <div className="space-y-3">
               <div className={`flex items-center gap-3 p-3 rounded-xl border ${profileData.verified ? 'bg-surface-tinted border-neutral-100' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
                 <div className={`p-2 rounded-lg ${profileData.verified ? 'bg-accent-light' : 'bg-neutral-100'}`}>
-                  <CheckCircle size={14} className={profileData.verified ? 'text-accent-hover' : 'text-neutral-400'} />
+                  <ShieldCheck size={14} className={profileData.verified ? 'text-accent-hover' : 'text-neutral-400'} />
                 </div>
                 <span className={`text-[13px] font-bold ${profileData.verified ? 'text-neutral-900' : 'text-neutral-500'}`}>
-                  Identity Verified
+                  Credentials Validated
                 </span>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-tinted border border-neutral-100 opacity-60">
-                <div className="p-2 bg-neutral-100 rounded-lg">
-                  <BookOpen size={14} className="text-neutral-400" />
-                </div>
-                <span className="text-[13px] font-bold text-neutral-500">License Validated</span>
               </div>
             </div>
           </div>
@@ -269,21 +263,28 @@ const Profile = () => {
               </div>
 
               <div className="grid md:grid-cols-2 gap-4 pt-2">
-                 <div className="p-5 rounded-2xl bg-white/5 border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
+                  <div className="p-5 rounded-2xl bg-white/5 border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${profileData.verified ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                        {profileData.verified ? <CheckCircle size={18} /> : <Loader2 size={18} className="animate-spin" />}
+                        {profileData.verified ? <ShieldCheck size={18} /> : <Loader2 size={18} className="animate-spin" />}
                       </div>
                       <div>
-                        <p className="font-bold text-[14px]">Identity Check</p>
-                        <p className="text-[12px] text-neutral-400">{profileData.verified ? 'Verified Successfully' : 'Under Review'}</p>
+                        <p className="font-bold text-[14px]">Clinical Verification</p>
+                        <p className="text-[12px] text-neutral-400">{profileData.verified ? 'License & Identity Verified' : 'Under Review'}</p>
                       </div>
                     </div>
-                 </div>
-                 <button className="p-5 rounded-2xl border border-dashed border-white/20 hover:border-white/40 hover:bg-white/5 transition-all text-center">
-                    <p className="font-bold text-[14px]">+ Upload Certification</p>
-                    <p className="text-[11px] text-neutral-500 mt-1 uppercase tracking-widest font-bold">PDF, JPG (Max 5MB)</p>
-                 </button>
+                  </div>
+                  <div className={`p-5 rounded-2xl border flex justify-between items-center group transition-colors ${profileData.verified ? 'bg-white/10 border-white/20' : 'border-dashed border-white/20 hover:border-white/40 hover:bg-white/5'}`}>
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${profileData.verified ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-neutral-500'}`}>
+                         {profileData.verified ? <CheckCircle size={18} /> : <BookOpen size={18} />}
+                      </div>
+                      <div>
+                        <p className="font-bold text-[14px]">{profileData.verified ? 'Documents Approved' : 'Upload Certification'}</p>
+                        <p className="text-[12px] text-neutral-400">{profileData.verified ? 'All credentials valid' : 'PDF, JPG (Max 5MB)'}</p>
+                      </div>
+                    </div>
+                  </div>
               </div>
             </div>
           </section>

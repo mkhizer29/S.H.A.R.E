@@ -82,7 +82,10 @@ const ProDashboard = () => {
   ];
 
   const upcomingSessions = sessions
-    .filter(s => s.status === 'upcoming')
+    .filter(s => {
+      const d = new Date(s.startsAt);
+      return d.toDateString() === now.toDateString() && s.status === 'upcoming';
+    })
     .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))
     .slice(0, 3);
 
@@ -211,7 +214,7 @@ const ProDashboard = () => {
                 <div>
                   <p className="font-bold text-neutral-900 text-[15px] mb-1">Action Required: Intake Notes</p>
                   <p className="text-[14px] font-medium text-neutral-600">Please complete your notes for recent sessions.</p>
-                  <button className="text-[13px] font-bold text-alert mt-3 hover:text-red-500 transition-colors">Complete Notes →</button>
+                  <button onClick={() => navigate('/pro/clients')} className="text-[13px] font-bold text-alert mt-3 hover:text-red-500 transition-colors">Complete Notes →</button>
                 </div>
               </div>
             </div>
