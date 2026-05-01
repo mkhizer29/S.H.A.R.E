@@ -37,7 +37,7 @@ const Clients = () => {
     conversations.forEach(conv => {
       const uid = conv.patientUid;
       if (!uid) return;
-      
+
       roster[uid] = {
         id: uid,
         alias: conv.patientAlias || conv.patientName || 'Anonymous',
@@ -74,7 +74,7 @@ const Clients = () => {
       if (sessionDate <= now && sessionDate > roster[uid].lastActive) {
         roster[uid].lastActive = sessionDate;
       }
-      
+
       // Update next session if in future
       if (session.status === 'upcoming' && sessionDate > now) {
         if (!roster[uid].nextSession || sessionDate < new Date(roster[uid].nextSession)) {
@@ -85,7 +85,7 @@ const Clients = () => {
     });
 
     const list = Object.values(roster).sort((a, b) => b.lastActive - a.lastActive);
-    
+
     if (!searchQuery) return list;
     return list.filter(c => c.alias.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [sessions, conversations, searchQuery]);
@@ -118,6 +118,9 @@ const Clients = () => {
     if (success) {
       setShowNoteModal(false);
     }
+    else {
+      alert('Could not save secure note. Please check Firestore permissions and try again.')
+    }
   };
 
   // Sync client count to database
@@ -147,12 +150,12 @@ const Clients = () => {
           <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">My Clients</h1>
           <p className="text-[15px] font-medium text-neutral-500 mt-2">Manage your active roster and secure case notes.</p>
         </div>
-        
+
         <div className="relative w-full md:w-80">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-neutral-400 w-5 h-5" />
-          <input 
-            type="text" 
-            placeholder="Search by alias..." 
+          <input
+            type="text"
+            placeholder="Search by alias..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-surface border-2 border-neutral-200 rounded-[20px] py-3.5 pl-11 pr-5 text-[15px] font-medium text-neutral-900 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-neutral-400 shadow-sm"
@@ -197,11 +200,10 @@ const Clients = () => {
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wide ${
-                        client.status === 'Active' ? 'bg-[#E6EFEA] text-[#6DA398] border border-[#6DA398]/30' :
-                        client.status === 'Upcoming Session' ? 'bg-primary-light/50 text-primary border border-primary-light' :
-                        'bg-surface-tinted text-neutral-500 border border-neutral-200'
-                      }`}>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wide ${client.status === 'Active' ? 'bg-[#E6EFEA] text-[#6DA398] border border-[#6DA398]/30' :
+                          client.status === 'Upcoming Session' ? 'bg-primary-light/50 text-primary border border-primary-light' :
+                            'bg-surface-tinted text-neutral-500 border border-neutral-200'
+                        }`}>
                         {client.status}
                       </span>
                     </td>
@@ -222,24 +224,24 @@ const Clients = () => {
                     </td>
                     <td className="px-8 py-5 text-right">
                       <div className="flex justify-end gap-2">
-                        <button 
+                        <button
                           onClick={() => handleMessageClient(client.id)}
-                          className="p-2.5 text-neutral-400 hover:text-primary hover:bg-primary-light transition-colors rounded-xl border border-transparent hover:border-primary-light" 
+                          className="p-2.5 text-neutral-400 hover:text-primary hover:bg-primary-light transition-colors rounded-xl border border-transparent hover:border-primary-light"
                           title="Message"
                         >
                           <MessageSquare size={18} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => {
                             setSelectedClient(client);
                             setShowNoteModal(true);
                           }}
-                          className="p-2.5 text-neutral-400 hover:text-primary hover:bg-primary-light transition-colors rounded-xl border border-transparent hover:border-primary-light" 
+                          className="p-2.5 text-neutral-400 hover:text-primary hover:bg-primary-light transition-colors rounded-xl border border-transparent hover:border-primary-light"
                           title="Secure Notes"
                         >
                           <FileText size={18} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => alert('Client details coming soon.')}
                           className="p-2.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-200 transition-colors rounded-xl"
                         >
@@ -268,22 +270,22 @@ const Clients = () => {
                   <p className="text-[14px] font-medium text-neutral-500">Drafting notes for {selectedClient.alias}</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowNoteModal(false)}
                 className="p-2 hover:bg-neutral-100 rounded-xl transition-colors text-neutral-400 hover:text-neutral-900"
               >
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="p-8 space-y-6">
               <div className="bg-surface-tinted p-5 rounded-2xl border border-neutral-100 space-y-3">
-                 <div className="flex items-center gap-2 text-[12px] font-bold text-neutral-400 uppercase tracking-wider">
-                    <Clock size={14} /> Last Session: {selectedClient.lastActive.toLocaleDateString()}
-                 </div>
-                 <p className="text-[14px] text-neutral-600 leading-relaxed font-medium">
-                   These notes are encrypted and only accessible by you. Patient will not be notified of these updates.
-                 </p>
+                <div className="flex items-center gap-2 text-[12px] font-bold text-neutral-400 uppercase tracking-wider">
+                  <Clock size={14} /> Last Session: {selectedClient.lastActive.toLocaleDateString()}
+                </div>
+                <p className="text-[14px] text-neutral-600 leading-relaxed font-medium">
+                  These notes are encrypted and only accessible by you. Patient will not be notified of these updates.
+                </p>
               </div>
 
               {isLoadingNote ? (
@@ -292,7 +294,7 @@ const Clients = () => {
                   <p className="text-neutral-400 text-sm font-medium">Retrieving secure notes...</p>
                 </div>
               ) : (
-                <textarea 
+                <textarea
                   placeholder="Start typing clinical notes..."
                   rows="6"
                   value={noteContent}
@@ -302,15 +304,15 @@ const Clients = () => {
               )}
 
               <div className="flex gap-3 pt-2">
-                <Button 
-                  fullWidth 
+                <Button
+                  fullWidth
                   onClick={handleSaveNote}
                   loading={isSavingNote}
                   className="!rounded-2xl"
                 >
                   Save Secure Note
                 </Button>
-                <button 
+                <button
                   onClick={() => setShowNoteModal(false)}
                   disabled={isSavingNote}
                   className="px-6 py-3 rounded-2xl font-bold text-neutral-500 hover:bg-neutral-100 transition-all"

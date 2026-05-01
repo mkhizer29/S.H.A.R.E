@@ -1,11 +1,11 @@
 import { create } from 'zustand'
 import { auth, db } from '../lib/firebase'
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
 import { generateKeyPair } from '../lib/crypto'
 
 
-export const useAuthStore = create((set) => ({
+export const useAuthStore = create((set, get) => ({
   user: null,
   role: null,
   isAuthenticated: false,
@@ -152,6 +152,29 @@ export const useAuthStore = create((set) => ({
   updateUser: (updates) => {
     set((state) => ({ user: { ...state.user, ...updates } }))
   },
+
+  updateProfile: async (updates) => {
+    const { user } = get();
+    if (!user?.uid) return false;
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      });
+
+      // If professional, also update their professional profile
+      if (user.role === 'professional') {
+        await updateDoc(doc(db, 'professionals', user.uid), updates);
+      }
+
+      set((state) => ({ user: { ...state.user, ...updates } }));
+      return true;
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      return false;
+    }
+  }
 }))
 
 export default useAuthStore;

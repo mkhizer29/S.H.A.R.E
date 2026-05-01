@@ -1,11 +1,23 @@
 import React from 'react';
 import { Menu, LogOut, Bell } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../stores/authStore';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 
 export default function TopNav() {
+  const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
+  const handleProfileClick = () => {
+    if (user?.role === 'professional') {
+      navigate('/pro/profile');
+    } else if (user?.role === 'patient') {
+      navigate('/patient/settings');
+    } else if (user?.role === 'admin') {
+      navigate('/admin');
+    }
+  };
 
   const handleQuickExit = () => {
     // Implement an instant redirect to a safe page like Google, 
@@ -50,7 +62,10 @@ export default function TopNav() {
 
           <div className="h-6 w-px bg-neutral-200 mx-1" />
 
-          <div className="flex items-center gap-3 cursor-pointer hover:bg-neutral-200/50 p-1.5 pr-3 rounded-full transition-colors group">
+          <div 
+            onClick={handleProfileClick}
+            className="flex items-center gap-3 cursor-pointer hover:bg-neutral-200/50 p-1.5 pr-3 rounded-full transition-colors group"
+          >
             <Avatar size="sm" name={user?.alias || user?.name} online={true} />
             <span className="text-[14px] font-medium text-neutral-900 hidden sm:block group-hover:text-primary transition-colors">
               {user?.alias || user?.name?.split(' ')[0]}
