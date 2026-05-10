@@ -241,12 +241,7 @@ const Clients = () => {
                         >
                           <FileText size={18} />
                         </button>
-                        <button
-                          onClick={() => alert('Client details coming soon.')}
-                          className="p-2.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-200 transition-colors rounded-xl"
-                        >
-                          <MoreHorizontal size={18} />
-                        </button>
+
                       </div>
                     </td>
                   </tr>

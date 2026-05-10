@@ -1,22 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Calendar as CalendarIcon, Banknote, MessageSquare, CheckCircle, TrendingUp, Phone, Clock } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Banknote, MessageSquare, CheckCircle, TrendingUp, Phone, Clock, FileText } from 'lucide-react';
 import useAuthStore from '../../stores/authStore';
 import { useBookingStore } from '../../stores/bookingStore';
 import { useChatStore } from '../../stores/chatStore';
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import JoinSessionButton from '../../components/JoinSessionButton';
+import ProofModal from '../../components/ui/ProofModal';
 
 const ProDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { sessions, loadBookings, isLoading } = useBookingStore();
   const { conversations, fetchConversations } = useChatStore();
+  const [selectedProof, setSelectedProof] = useState(null);
+  const [isProofModalOpen, setIsProofModalOpen] = useState(false);
 
   useEffect(() => {
     if (user?.uid) {
@@ -93,7 +95,7 @@ const ProDashboard = () => {
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="flex justify-between items-end px-1">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Welcome, {user?.name || 'Dr. Professional'}</h1>
+          <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Welcome, {user?.name || 'Professional'}</h1>
           <p className="text-[15px] font-medium text-neutral-500 mt-2">Here's your practice overview for today.</p>
         </div>
         {!user?.verified && (
@@ -134,7 +136,7 @@ const ProDashboard = () => {
           <Card hover={false} className="p-6 md:p-8">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-neutral-900 tracking-tight">Today's Schedule</h3>
-              <button className="text-[14px] font-semibold text-primary hover:text-primary-hover transition-colors">View Calendar →</button>
+              <button onClick={() => navigate('/pro/calendar')} className="text-[14px] font-semibold text-primary hover:text-primary-hover transition-colors">View Calendar →</button>
             </div>
             <div className="space-y-4">
               {isLoading ? (
@@ -165,12 +167,26 @@ const ProDashboard = () => {
                           {new Date(session.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <JoinSessionButton 
-                        startsAt={session.startsAt} 
-                        sessionId={session.id} 
-                        role="professional" 
-                        size="sm"
-                      />
+                      <div className="flex items-center gap-2">
+                        {session.paymentProof && (
+                          <div 
+                            onClick={() => {
+                              setSelectedProof(session);
+                              setIsProofModalOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-light text-primary hover:bg-primary-light/80 transition-all text-[11px] font-bold cursor-pointer"
+                          >
+                            <FileText size={14} strokeWidth={2.5} />
+                            <span>PROOF</span>
+                          </div>
+                        )}
+                        <JoinSessionButton 
+                          startsAt={session.startsAt} 
+                          sessionId={session.id} 
+                          role="professional" 
+                          size="sm"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))
@@ -209,18 +225,17 @@ const ProDashboard = () => {
                   )
                 })
               )}
-              <div className="p-5 rounded-2xl bg-alert-light/50 border border-alert-light flex gap-4 items-start">
-                <CheckCircle className="w-5 h-5 text-alert mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-bold text-neutral-900 text-[15px] mb-1">Action Required: Intake Notes</p>
-                  <p className="text-[14px] font-medium text-neutral-600">Please complete your notes for recent sessions.</p>
-                  <button onClick={() => navigate('/pro/clients')} className="text-[13px] font-bold text-alert mt-3 hover:text-red-500 transition-colors">Complete Notes →</button>
-                </div>
-              </div>
+
             </div>
           </Card>
         </motion.div>
       </div>
+      <ProofModal 
+        isOpen={isProofModalOpen} 
+        onClose={() => setIsProofModalOpen(false)} 
+        proofData={selectedProof?.paymentProof}
+        sessionData={selectedProof}
+      />
     </div>
   );
 };

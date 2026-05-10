@@ -54,7 +54,7 @@ export default function PatientDashboard() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-1">
         <p className="text-neutral-500 text-[15px] font-medium">Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'} 👋</p>
-        <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">{user?.alias || 'WillowDream'}</h1>
+        <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">{user?.alias || 'Guest'}</h1>
         <p className="text-neutral-500 text-[15px]">Here's your wellbeing overview for today.</p>
       </motion.div>
 

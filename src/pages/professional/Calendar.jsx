@@ -10,11 +10,13 @@ import {
   Phone,
   Settings2,
   Trash2,
-  Video
+  Video,
+  FileText
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useBookingStore } from '../../stores/bookingStore'
 import { useAvailabilityStore } from '../../stores/availabilityStore'
+import ProofModal from '../../components/ui/ProofModal'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const GRID_START_HOUR = 8
@@ -162,6 +164,8 @@ const Calendar = () => {
 
   const navigate = useNavigate()
   const [weekOffset, setWeekOffset] = useState(0)
+  const [selectedProof, setSelectedProof] = useState(null)
+  const [isProofModalOpen, setIsProofModalOpen] = useState(false)
 
   useEffect(() => {
     if (!user?.uid) return
@@ -453,8 +457,21 @@ const Calendar = () => {
                               <div className="truncate text-sm font-bold">
                                 {session.patientAlias || 'Client'}
                               </div>
-                              <div className="mt-1 truncate text-xs opacity-90">
-                                {session.type || 'Session'}
+                              <div className="mt-1 flex items-center justify-between gap-1 truncate text-xs opacity-90">
+                                <span>{session.type || 'Session'}</span>
+                                {session.paymentProof && (
+                                  <div 
+                                    className="flex items-center gap-1 bg-white/20 px-1.5 py-0.5 rounded-md cursor-pointer hover:bg-white/30 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedProof(session);
+                                      setIsProofModalOpen(true);
+                                    }}
+                                  >
+                                    <FileText size={12} strokeWidth={2.5} />
+                                    <span className="text-[10px] font-bold uppercase">Proof</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )
@@ -517,6 +534,18 @@ const Calendar = () => {
                             {session.type ? <span>· {session.type}</span> : null}
                           </div>
                         </div>
+                        {session.paymentProof && (
+                          <button 
+                            onClick={() => {
+                              setSelectedProof(session);
+                              setIsProofModalOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-light text-primary hover:bg-primary-light/80 transition-all text-[11px] font-bold"
+                          >
+                            <FileText size={14} strokeWidth={2.5} />
+                            <span>PROOF</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -557,6 +586,12 @@ const Calendar = () => {
           </motion.div>
         </div>
       </div>
+      <ProofModal 
+        isOpen={isProofModalOpen} 
+        onClose={() => setIsProofModalOpen(false)} 
+        proofData={selectedProof?.paymentProof}
+        sessionData={selectedProof}
+      />
     </>
   )
 }

@@ -43,12 +43,13 @@ function CheckoutForm({ pro, onClose }) {
   const navigate = useNavigate()
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [method, setMethod] = useState('card')
+  const [method, setMethod] = useState('bank')
   const [availableDays, setAvailableDays] = useState([])
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [loadingSlots, setLoadingSlots] = useState(true)
   const [slotError, setSlotError] = useState(null)
   const [resolvedProId, setResolvedProId] = useState(null)
+  const [proofFile, setProofFile] = useState(null)
 
   useEffect(() => {
     let alive = true
@@ -110,6 +111,11 @@ function CheckoutForm({ pro, onClose }) {
       return
     }
 
+    if (!proofFile) {
+      alert('Please upload a proof of transfer to confirm your booking.')
+      return
+    }
+
     setProcessing(true)
 
     try {
@@ -139,6 +145,49 @@ function CheckoutForm({ pro, onClose }) {
       const startsAtIso = new Date(selectedSlot.startsAt).toISOString()
       const bookingId = buildBookingId(canonicalProId, startsAtIso)
 
+      // Convert and compress file to Data URL for direct viewing in Firestore
+      let proofData = proofFile.name
+      try {
+        proofData = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            const img = new Image()
+            img.onload = () => {
+              const canvas = document.createElement('canvas')
+              // Max dimensions for compression
+              const MAX_WIDTH = 1200
+              const MAX_HEIGHT = 1200
+              let width = img.width
+              let height = img.height
+
+              if (width > height) {
+                if (width > MAX_WIDTH) {
+                  height *= MAX_WIDTH / width
+                  width = MAX_WIDTH
+                }
+              } else {
+                if (height > MAX_HEIGHT) {
+                  width *= MAX_HEIGHT / height
+                  height = MAX_HEIGHT
+                }
+              }
+              canvas.width = width
+              canvas.height = height
+              const ctx = canvas.getContext('2d')
+              ctx.drawImage(img, 0, 0, width, height)
+              // Compress to JPEG with 0.6 quality to ensure it's < 1MB
+              resolve(canvas.toDataURL('image/jpeg', 0.6))
+            }
+            img.onerror = reject
+            img.src = e.target.result
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(proofFile)
+        })
+      } catch (err) {
+        console.error('[CheckoutModal] Proof compression failed:', err)
+      }
+
       const specialty = getSpecialtyLabel(pro)
       const bookingData = {
         patientId: user.uid,
@@ -152,6 +201,8 @@ function CheckoutForm({ pro, onClose }) {
         type: 'Video',
         amount: Number(pro?.pricePerSession || 3000),
         currency: pro?.currency || 'PKR',
+        paymentMethod: 'bank_transfer',
+        paymentProof: proofData, 
         createdAt: serverTimestamp()
       }
 
@@ -189,7 +240,7 @@ function CheckoutForm({ pro, onClose }) {
           entityType: 'booking',
           entityId: bookingId,
           title: 'New Session Request',
-          body: `You have a new session scheduled with ${user.alias || user.name} on ${new Date(selectedSlot.startsAt).toLocaleDateString()}.`,
+          body: `You have a new session scheduled with ${user.alias || user.name} on ${new Date(selectedSlot.startsAt).toLocaleDateString()}. Payment proof uploaded.`,
           link: '/pro/calendar'
         });
 
@@ -330,48 +381,16 @@ function CheckoutForm({ pro, onClose }) {
       </div>
 
       <div className="rounded-[22px] border border-neutral-200 bg-white p-2">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setMethod('card')}
-            className={`rounded-xl px-4 py-3 text-sm font-bold transition ${method === 'card'
-                ? 'bg-primary text-white shadow-float-primary'
-                : 'text-neutral-500 hover:bg-primary-light/10 hover:text-primary'
-              }`}
+        <div className="grid grid-cols-1">
+          <div
+            className="rounded-xl px-4 py-3 text-sm font-bold transition bg-primary text-white shadow-float-primary text-center"
           >
-            Credit/Debit Card
-          </button>
-          <button
-            type="button"
-            onClick={() => setMethod('bank')}
-            className={`rounded-xl px-4 py-3 text-sm font-bold transition ${method === 'bank'
-                ? 'bg-primary text-white shadow-float-primary'
-                : 'text-neutral-500 hover:bg-primary-light/10 hover:text-primary'
-              }`}
-          >
-            Online Transfer
-          </button>
+            Online Bank Transfer
+          </div>
         </div>
       </div>
 
-      {method === 'card' ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-neutral-700">Name on Card</span>
-            <input
-              className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
-              placeholder="Optional for anonymity"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-neutral-700">Card Number</span>
-            <input
-              className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-primary"
-              placeholder="4242 4242 4242 4242"
-            />
-          </label>
-        </div>
-      ) : (
+      <div className="space-y-4">
         <div className="rounded-[24px] border border-neutral-200 bg-surface p-5 text-sm text-neutral-700">
           <div className="mb-2 font-bold text-neutral-900">Our Bank Details</div>
           <div className="space-y-1">
@@ -380,7 +399,27 @@ function CheckoutForm({ pro, onClose }) {
             <div>PK24 HABB 0001 2345 6789 0123</div>
           </div>
         </div>
-      )}
+
+        <div className="rounded-[24px] border border-neutral-200 bg-white p-5 border-dashed">
+          <label className="cursor-pointer block text-center">
+            <span className="mb-3 block text-sm font-bold text-neutral-500 uppercase tracking-wider">Upload Transfer Proof</span>
+            <div className="flex flex-col items-center gap-2">
+              <div className="p-4 bg-primary-light/30 rounded-full text-primary">
+                <Shield className="w-6 h-6" />
+              </div>
+              <span className="text-[14px] font-medium text-neutral-600">
+                {proofFile ? proofFile.name : "Click to select screenshot/receipt"}
+              </span>
+              <input 
+                type="file" 
+                className="hidden" 
+                accept="image/*,.pdf" 
+                onChange={(e) => setProofFile(e.target.files[0])}
+              />
+            </div>
+          </label>
+        </div>
+      </div>
 
       <div className="flex items-start gap-2 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
         <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -389,7 +428,7 @@ function CheckoutForm({ pro, onClose }) {
 
       <button
         type="submit"
-        disabled={processing || !selectedSlot}
+        disabled={processing || !selectedSlot || !proofFile}
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 text-sm font-bold text-white shadow-float-primary transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {processing ? (
@@ -400,7 +439,7 @@ function CheckoutForm({ pro, onClose }) {
         ) : (
           <>
             <CreditCard className="h-4 w-4" />
-            Confirm Payment & Connect
+            Confirm Transfer & Connect
           </>
         )}
       </button>

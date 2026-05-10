@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Banknote, TrendingUp, CheckCircle, Clock, Calendar, AlertCircle, ArrowDownRight, ArrowUpRight, Settings2, Info } from 'lucide-react';
+import { Banknote, TrendingUp, CheckCircle, Clock, Calendar, AlertCircle, ArrowDownRight, ArrowUpRight, Settings2, Info, FileText } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Avatar from '../../components/ui/Avatar';
+import ProofModal from '../../components/ui/ProofModal';
 import { useAuthStore } from '../../stores/authStore';
 import { useBookingStore } from '../../stores/bookingStore';
 
@@ -33,6 +34,8 @@ const Revenue = () => {
   const { user } = useAuthStore();
   const { sessions, loadBookings, isLoading } = useBookingStore();
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedProof, setSelectedProof] = useState(null);
+  const [isProofModalOpen, setIsProofModalOpen] = useState(false);
 
   useEffect(() => {
     if (user?.uid) {
@@ -316,10 +319,24 @@ const Revenue = () => {
                                 {row.status === 'cancelled' ? '—' : (gross > 0 ? formatPKR(net) : '—')}
                               </td>
                               <td className="px-8 py-5">
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold tracking-wide uppercase border ${cfg.cls}`}>
-                                  <StatusIcon size={14} strokeWidth={2.5} />
-                                  {cfg.label}
-                                </span>
+                                <div className="flex items-center gap-3">
+                                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold tracking-wide uppercase border ${cfg.cls}`}>
+                                    <StatusIcon size={14} strokeWidth={2.5} />
+                                    {cfg.label}
+                                  </span>
+                                  {row.paymentProof && (
+                                    <button 
+                                      onClick={() => {
+                                        setSelectedProof(row);
+                                        setIsProofModalOpen(true);
+                                      }}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition-all text-[11px] font-bold border border-neutral-200"
+                                    >
+                                      <FileText size={13} strokeWidth={2.5} />
+                                      <span>Proof</span>
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -399,6 +416,12 @@ const Revenue = () => {
           </div>
         </div>
       </motion.div>
+      <ProofModal 
+        isOpen={isProofModalOpen} 
+        onClose={() => setIsProofModalOpen(false)} 
+        proofData={selectedProof?.paymentProof}
+        sessionData={selectedProof}
+      />
     </div>
   );
 };

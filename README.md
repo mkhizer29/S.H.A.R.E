@@ -15,7 +15,7 @@ SHARE is a premium, privacy-first mental health platform designed for the Pakist
 
 - **Frontend**: React, Vite, Tailwind CSS, Framer Motion
 - **State Management**: Zustand
-- **Backend/Auth**: Firebase (Auth & Firestore) - *Demo mode includes mock fallback*
+- **Backend/Auth**: Firebase (Auth & Firestore) - Real-time secure persistence
 - **Encryption**: TweetNaCl (Local E2E)
 - **Icons**: Lucide React
 
@@ -64,13 +64,6 @@ Then, deploy to Firebase:
 ```bash
 firebase deploy
 ```
-
-## ⚠️ Demo Mode Notice
-
-This application is currently in a high-fidelity **Demo Mode**. 
-- Voice calls and Chat are simulated to showcase the end-to-end encrypted experience.
-- Authentication falls back to demo accounts if Firebase keys are not provided.
-- Payment processing is simulated through a secure checkout UI.
 
 ---
 *Built with care for a safer, more supportive world.*
