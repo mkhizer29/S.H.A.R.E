@@ -19,7 +19,8 @@ import {
   serverTimestamp,
   where
 } from 'firebase/firestore'
-import { db } from '../../lib/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { db, storage } from '../../lib/firebase'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatStore } from '../../stores/chatStore'
 import { getAvailableSlots, resolveProId } from '../../utils/slotUtils'
@@ -149,47 +150,16 @@ function CheckoutForm({ pro, onClose }) {
       const startsAtIso = new Date(selectedSlot.startsAt).toISOString()
       const bookingId = buildBookingId(canonicalProId, startsAtIso)
 
-      // Convert and compress file to Data URL for direct viewing in Firestore
-      let proofData = proofFile.name
+      const proofId = `proof_${Date.now()}_${Math.floor(Math.random() * 1000000)}`
+      let fileUrl = ''
+      
       try {
-        proofData = await new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            const img = new Image()
-            img.onload = () => {
-              const canvas = document.createElement('canvas')
-              // Max dimensions for compression
-              const MAX_WIDTH = 1200
-              const MAX_HEIGHT = 1200
-              let width = img.width
-              let height = img.height
-
-              if (width > height) {
-                if (width > MAX_WIDTH) {
-                  height *= MAX_WIDTH / width
-                  width = MAX_WIDTH
-                }
-              } else {
-                if (height > MAX_HEIGHT) {
-                  width *= MAX_HEIGHT / height
-                  height = MAX_HEIGHT
-                }
-              }
-              canvas.width = width
-              canvas.height = height
-              const ctx = canvas.getContext('2d')
-              ctx.drawImage(img, 0, 0, width, height)
-              // Compress to JPEG with 0.6 quality to ensure it's < 1MB
-              resolve(canvas.toDataURL('image/jpeg', 0.6))
-            }
-            img.onerror = reject
-            img.src = e.target.result
-          }
-          reader.onerror = reject
-          reader.readAsDataURL(proofFile)
-        })
+        const storageRef = ref(storage, `payment_proofs/${proofId}`)
+        await uploadBytes(storageRef, proofFile)
+        fileUrl = await getDownloadURL(storageRef)
       } catch (err) {
-        console.error('[CheckoutModal] Proof compression failed:', err)
+        console.error('[CheckoutModal] Storage upload failed:', err)
+        throw new Error('Failed to upload payment proof. Please try again.')
       }
 
       const specialty = getSpecialtyLabel(pro)
@@ -202,18 +172,31 @@ function CheckoutForm({ pro, onClose }) {
         startsAt: startsAtIso,
         duration: Number(selectedSlot.duration || 50),
         status: 'upcoming',
+        paymentStatus: 'pending',
         type: 'Video',
         amount: Number(pro?.pricePerSession || 3000),
         currency: pro?.currency || 'PKR',
         paymentMethod: 'bank_transfer',
-        paymentProof: proofData, 
+        paymentProofId: proofId, 
+        createdAt: serverTimestamp()
+      }
+
+      const proofDataDoc = {
+        bookingId,
+        patientId: user.uid,
+        professionalId: canonicalProId,
+        amount: Number(pro?.pricePerSession || 3000),
+        currency: pro?.currency || 'PKR',
+        method: 'bank_transfer',
+        fileUrl,
+        status: 'pending',
         createdAt: serverTimestamp()
       }
 
       const bookingRef = doc(db, 'bookings', bookingId)
+      const proofRef = doc(db, 'payment_proofs', proofId)
 
       console.log('[CheckoutModal] Step 4: Running booking transaction...', bookingId)
-      console.log('[CheckoutModal] Step 4: Proof data size:', typeof proofData === 'string' ? (proofData.length / 1024).toFixed(1) + 'KB' : 'N/A')
       await runTransaction(db, async (transaction) => {
         const existingBooking = await transaction.get(bookingRef)
 
@@ -226,6 +209,7 @@ function CheckoutForm({ pro, onClose }) {
         }
 
         transaction.set(bookingRef, bookingData)
+        transaction.set(proofRef, proofDataDoc)
       })
       console.log('[CheckoutModal] Step 4: Booking transaction SUCCESS')
 

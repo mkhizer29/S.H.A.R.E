@@ -42,6 +42,20 @@ export const useAuthStore = create((set, get) => ({
         }
 
         try {
+          const adminDoc = await getDoc(doc(db, 'admin_access', firebaseUser.uid));
+          if (adminDoc.exists() && adminDoc.data().isActive && adminDoc.data().email === firebaseUser.email) {
+            const adminData = adminDoc.data();
+            set({ 
+              user: { uid: firebaseUser.uid, email: firebaseUser.email, ...adminData, role: 'admin' },
+              role: 'admin',
+              isAuthenticated: true,
+              needsEmailVerification: false,
+              pendingUser: null,
+              authInitialized: true
+            });
+            return;
+          }
+
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
             let userData = userDoc.data();
@@ -121,6 +135,22 @@ export const useAuthStore = create((set, get) => ({
       }
 
       const uid = firebaseUser.uid;
+      
+      const adminDoc = await getDoc(doc(db, 'admin_access', uid));
+      if (adminDoc.exists() && adminDoc.data().isActive && adminDoc.data().email === email) {
+        const adminData = adminDoc.data();
+        const user = { uid, email, ...adminData, role: 'admin' };
+        set({ 
+          user, 
+          role: 'admin', 
+          isAuthenticated: true, 
+          needsEmailVerification: false,
+          pendingUser: null,
+          isLoading: false 
+        });
+        return { user };
+      }
+
       const userDoc = await getDoc(doc(db, 'users', uid));
       
       if (userDoc.exists()) {
@@ -168,6 +198,14 @@ export const useAuthStore = create((set, get) => ({
       const firebaseUser = result.user;
       const uid = firebaseUser.uid;
       const email = firebaseUser.email;
+
+      const adminDoc = await getDoc(doc(db, 'admin_access', uid));
+      if (adminDoc.exists() && adminDoc.data().isActive && adminDoc.data().email === email) {
+        const adminData = adminDoc.data();
+        const user = { uid, email, ...adminData, role: 'admin' };
+        set({ user, role: 'admin', isAuthenticated: true, needsEmailVerification: false, pendingUser: null, isLoading: false, _googleSignInInProgress: false });
+        return { user };
+      }
 
       const userDocRef = doc(db, 'users', uid);
       const userDoc = await getDoc(userDocRef);
