@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { auth, db, googleProvider } from '../lib/firebase'
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPopup } from 'firebase/auth'
+import { onAuthStateChanged, signOut, signInWithPopup, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth'
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
 import { generateKeyPair } from '../lib/crypto'
 
 
 export const useAuthStore = create((set, get) => ({
   user: null,
+  pendingUser: null,
   role: null,
   isAuthenticated: false,
   isLoading: false,
@@ -75,45 +76,58 @@ export const useAuthStore = create((set, get) => ({
     return unsubscribe;
   },
 
-  login: async (email, password) => {
-    set({ isLoading: true })
+  sendEmailLinkSignIn: async (email) => {
+    set({ isLoading: true });
     try {
-      // Attempt real Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
+      const actionCodeSettings = {
+        url: 'https://share-platform-2a6a2.web.app/signin',
+        handleCodeInApp: true,
+      };
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      window.localStorage.setItem('emailForSignIn', email);
+      set({ isLoading: false });
+    } catch (error) {
+      set({ isLoading: false });
+      console.error("Error sending email link:", error);
+      throw error;
+    }
+  },
 
-      // Fetch user profile and role from Firestore
-      const userDoc = await getDoc(doc(db, 'users', uid));
+  completeEmailLinkSignIn: async (email, href) => {
+    set({ isLoading: true });
+    try {
+      if (!isSignInWithEmailLink(auth, href)) {
+        throw new Error("Invalid sign-in link.");
+      }
       
+      const result = await signInWithEmailLink(auth, email, href);
+      window.localStorage.removeItem('emailForSignIn');
+      
+      const firebaseUser = result.user;
+      const uid = firebaseUser.uid;
+      
+      const userDoc = await getDoc(doc(db, 'users', uid));
       if (userDoc.exists()) {
         let userData = userDoc.data();
-        
-        // Sync verification status for professionals
         if (userData.role === 'professional') {
           const proDoc = await getDoc(doc(db, 'professionals', uid));
           if (proDoc.exists()) {
             userData = { ...userData, ...proDoc.data() };
           }
         }
-
-        const user = { uid, email, ...userData };
-        set({ 
-          user, 
-          role: userData.role, 
-          isAuthenticated: true, 
-          isLoading: false 
-        })
-        return user;
+        const user = { uid, email: firebaseUser.email, ...userData };
+        set({ user, role: userData.role, isAuthenticated: true, isLoading: false });
+        return { user };
       } else {
-        // Firebase user exists but Firestore doc is missing
-        console.error(`No Firestore document found for UID: ${uid}`);
-        set({ isLoading: false });
-        throw new Error("Your user profile is missing. Please contact support or sign up again.");
+        const defaultAlias = email.split('@')[0];
+        const pendingUser = { uid, email: firebaseUser.email, defaultAlias };
+        set({ pendingUser, isAuthenticated: false, isLoading: false });
+        return { pendingUser };
       }
     } catch (error) {
       set({ isLoading: false });
-      console.error("Login Error:", error.message);
-      throw error; // Propagate to UI
+      console.error("Error completing email link sign-in:", error);
+      throw error;
     }
   },
 
@@ -144,24 +158,11 @@ export const useAuthStore = create((set, get) => ({
         set({ user, role: userData.role, isAuthenticated: true, isLoading: false, _googleSignInInProgress: false });
         return user;
       } else {
-        // First-time Google user — create Firestore profile
-        const alias = firebaseUser.displayName || email.split('@')[0];
-        const role = 'patient'; // Default role for Google sign-in
-        const keys = generateKeyPair();
-
-        await setDoc(userDocRef, {
-          email,
-          alias,
-          role,
-          publicKey: keys.publicKey,
-          createdAt: new Date().toISOString()
-        });
-
-        localStorage.setItem(`SHARE_SECRET_${uid}`, keys.secretKey);
-
-        const user = { uid, email, alias, role, publicKey: keys.publicKey };
-        set({ user, role, isAuthenticated: true, isLoading: false, _googleSignInInProgress: false });
-        return user;
+        // First-time Google user — set pending state for onboarding
+        const defaultAlias = firebaseUser.displayName || email.split('@')[0];
+        const pendingUser = { uid, email, defaultAlias };
+        set({ pendingUser, isAuthenticated: false, isLoading: false, _googleSignInInProgress: false });
+        return { pendingUser };
       }
     } catch (error) {
       set({ isLoading: false, _googleSignInInProgress: false });
@@ -173,17 +174,18 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  register: async (email, password, alias, role) => {
+  completeOnboarding: async (alias, role) => {
     set({ isLoading: true })
     try {
-      // 1. Create Firebase Auth User
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
+      const { pendingUser } = get();
+      if (!pendingUser) throw new Error("No pending user found to onboard.");
+      
+      const { uid, email } = pendingUser;
 
-      // 2. Generate E2E Crypto Keys for the user locally
+      // 1. Generate E2E Crypto Keys for the user locally
       const keys = generateKeyPair();
 
-      // 3. Store the Public Key and role in Firestore openly
+      // 2. Store the Public Key and role in Firestore openly
       await setDoc(doc(db, 'users', uid), {
         email,
         alias,
@@ -192,7 +194,7 @@ export const useAuthStore = create((set, get) => ({
         createdAt: new Date().toISOString()
       });
 
-      // 4. If professional, initialize their public profile
+      // 3. If professional, initialize their public profile
       if (role === 'professional') {
         await setDoc(doc(db, 'professionals', uid), {
           name: alias, // Alias serves as Full Name for pros in signup
@@ -213,10 +215,12 @@ export const useAuthStore = create((set, get) => ({
       // Keep SecretKey locally
       localStorage.setItem(`SHARE_SECRET_${uid}`, keys.secretKey);
 
-      set({ user: { uid, email, alias, role }, role, isAuthenticated: true, isLoading: false })
+      const user = { uid, email, alias, role, publicKey: keys.publicKey };
+      set({ user, role, pendingUser: null, isAuthenticated: true, isLoading: false })
+      return user;
     } catch (error) {
       set({ isLoading: false });
-      console.error("Registration Error:", error.message);
+      console.error("Onboarding Error:", error.message);
       throw error;
     }
   },
