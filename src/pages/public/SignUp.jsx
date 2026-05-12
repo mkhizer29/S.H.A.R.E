@@ -5,16 +5,12 @@ import { Shield, User, Briefcase, ChevronRight, Check } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import Input from '../../components/ui/Input'
 
-const ROLE_OPTIONS = [
-  { role: 'patient', label: 'I need support', desc: 'Browse professionals, book sessions, chat anonymously', icon: User, color: 'border-lilac-200 bg-white', activeColor: 'border-violet-600 bg-violet-50' },
-  { role: 'professional', label: 'I\'m a professional', desc: 'Join as a specialist, counsellor, or psychiatrist', icon: Briefcase, color: 'border-lilac-200 bg-white', activeColor: 'border-sage-500 bg-sage-50' },
-]
+
 
 export default function SignUp() {
   const navigate = useNavigate()
   const { register, signInWithGoogle, isLoading } = useAuthStore()
   const [googleLoading, setGoogleLoading] = useState(false)
-  const [selectedRole, setSelectedRole] = useState('patient')
   const [alias, setAlias] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -22,9 +18,8 @@ export default function SignUp() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await register(email, password, alias, selectedRole)
-      if (selectedRole === 'patient') navigate('/patient')
-      else navigate('/pro')
+      await register(email, password, alias, 'patient')
+      navigate('/patient')
     } catch (error) {
       console.error('Signup error:', error)
       alert(error.message || 'Failed to create account. Please try again.')
@@ -69,47 +64,19 @@ export default function SignUp() {
           Already have one? <Link to="/signin" className="text-violet-600 font-bold hover:underline">Sign in</Link>
         </p>
 
-        {/* Role selection */}
-        <p className="text-[13px] uppercase tracking-widest font-bold text-text-muted mb-4">I am joining as...</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {ROLE_OPTIONS.map((r) => {
-            const isSelected = selectedRole === r.role
-            return (
-              <motion.button
-                key={r.role}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setSelectedRole(r.role)}
-                className={`p-5 rounded-[24px] border-2 text-left transition-all ${
-                  isSelected ? r.activeColor : r.color + ' hover:border-lilac-300'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3 text-text-main">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-white shadow-sm' : 'bg-lilac-50'}`}>
-                    <r.icon size={18} className={isSelected ? 'text-text-main' : 'text-text-muted'} />
-                  </div>
-                  {isSelected && <div className="w-6 h-6 bg-text-main rounded-full flex items-center justify-center"><Check size={14} className="text-white" /></div>}
-                </div>
-                <p className={`text-[15px] font-bold mb-1 tracking-tight text-text-main`}>{r.label}</p>
-                <p className={`text-[13px] font-medium leading-relaxed ${isSelected ? 'text-text-main/80' : 'text-text-muted'}`}>{r.desc}</p>
-              </motion.button>
-            )
-          })}
-        </div>
+
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <Input
-            label={selectedRole === 'patient' ? 'Choose a Pseudonym (Alias)' : 'Full Name'}
-            placeholder={selectedRole === 'patient' ? 'e.g. WillowDream42' : 'Dr. Your Name'}
+            label="Choose a Pseudonym (Alias)"
+            placeholder="e.g. WillowDream42"
             value={alias}
             onChange={(e) => setAlias(e.target.value)}
           />
-          {selectedRole === 'patient' && (
-            <p className="text-[13px] font-medium text-sage-600 bg-sage-50 p-3 rounded-xl border border-sage-100 flex gap-2 items-start mt-2">
-              <span className="text-lg leading-none">💡</span> 
-              <span>This alias is what the platform uses. Your real identity is never exposed.</span>
-            </p>
-          )}
+          <p className="text-[13px] font-medium text-sage-600 bg-sage-50 p-3 rounded-xl border border-sage-100 flex gap-2 items-start mt-2">
+            <span className="text-lg leading-none">💡</span> 
+            <span>This alias is what the platform uses. Your real identity is never exposed.</span>
+          </p>
           <Input
             label="Email"
             placeholder="your@email.com"
