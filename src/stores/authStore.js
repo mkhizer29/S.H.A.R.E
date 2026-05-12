@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { auth, db } from '../lib/firebase'
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth'
+import { auth, db, googleProvider } from '../lib/firebase'
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, signInWithPopup } from 'firebase/auth'
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
 import { generateKeyPair } from '../lib/crypto'
 
@@ -11,10 +11,17 @@ export const useAuthStore = create((set, get) => ({
   isAuthenticated: false,
   isLoading: false,
   authInitialized: false,
+  _googleSignInInProgress: false,
 
   initializeAuth: () => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // If Google sign-in is in progress, skip — signInWithGoogle will handle state
+        if (get()._googleSignInInProgress) {
+          set({ authInitialized: true });
+          return;
+        }
+
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
@@ -35,8 +42,27 @@ export const useAuthStore = create((set, get) => ({
               authInitialized: true
             });
           } else {
-            console.warn("User authenticated but profile document missing in Firestore.");
-            set({ user: null, role: null, isAuthenticated: false, authInitialized: true });
+            // Doc may not exist yet for brand-new Google users — wait briefly and retry once
+            await new Promise(r => setTimeout(r, 1500));
+            const retryDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            if (retryDoc.exists()) {
+              let userData = retryDoc.data();
+              if (userData.role === 'professional') {
+                const proDoc = await getDoc(doc(db, 'professionals', firebaseUser.uid));
+                if (proDoc.exists()) {
+                  userData = { ...userData, ...proDoc.data() };
+                }
+              }
+              set({
+                user: { uid: firebaseUser.uid, email: firebaseUser.email, ...userData },
+                role: userData.role,
+                isAuthenticated: true,
+                authInitialized: true
+              });
+            } else {
+              console.warn("User authenticated but profile document missing in Firestore.");
+              set({ user: null, role: null, isAuthenticated: false, authInitialized: true });
+            }
           }
         } catch (error) {
           console.error("Auth rehydration error:", error);
@@ -91,6 +117,61 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  signInWithGoogle: async () => {
+    set({ isLoading: true, _googleSignInInProgress: true });
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const firebaseUser = result.user;
+      const uid = firebaseUser.uid;
+      const email = firebaseUser.email;
+
+      // Check if user already exists in Firestore
+      const userDocRef = doc(db, 'users', uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        // Returning Google user — load existing profile
+        let userData = userDoc.data();
+
+        if (userData.role === 'professional') {
+          const proDoc = await getDoc(doc(db, 'professionals', uid));
+          if (proDoc.exists()) {
+            userData = { ...userData, ...proDoc.data() };
+          }
+        }
+
+        const user = { uid, email, ...userData };
+        set({ user, role: userData.role, isAuthenticated: true, isLoading: false, _googleSignInInProgress: false });
+        return user;
+      } else {
+        // First-time Google user — create Firestore profile
+        const alias = firebaseUser.displayName || email.split('@')[0];
+        const role = 'patient'; // Default role for Google sign-in
+        const keys = generateKeyPair();
+
+        await setDoc(userDocRef, {
+          email,
+          alias,
+          role,
+          publicKey: keys.publicKey,
+          createdAt: new Date().toISOString()
+        });
+
+        localStorage.setItem(`SHARE_SECRET_${uid}`, keys.secretKey);
+
+        const user = { uid, email, alias, role, publicKey: keys.publicKey };
+        set({ user, role, isAuthenticated: true, isLoading: false, _googleSignInInProgress: false });
+        return user;
+      }
+    } catch (error) {
+      set({ isLoading: false, _googleSignInInProgress: false });
+      // User closed popup or other error
+      if (error.code !== 'auth/popup-closed-by-user') {
+        console.error('Google Sign-In Error:', error.message);
+        throw error;
+      }
+    }
+  },
 
   register: async (email, password, alias, role) => {
     set({ isLoading: true })

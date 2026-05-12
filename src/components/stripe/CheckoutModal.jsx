@@ -123,13 +123,17 @@ function CheckoutForm({ pro, onClose }) {
       if (!user?.uid) {
         throw new Error('You must be signed in to book a session.')
       }
+      console.log('[CheckoutModal] Step 1: User verified', user.uid)
 
       const canonicalProId = resolvedProId || (await resolveProId(pro))
       if (!canonicalProId) {
         throw new Error('Could not resolve professional identity. Please try again.')
       }
+      console.log('[CheckoutModal] Step 2: Pro resolved', canonicalProId)
 
+      console.log('[CheckoutModal] Step 3: Fetching latest slots...')
       const latestDays = await getAvailableSlots({ ...pro, uid: canonicalProId }, 14)
+      console.log('[CheckoutModal] Step 3: Done, got', latestDays.length, 'days')
 
       const selectedStillFree = latestDays.some((day) =>
         day.slots.some(
@@ -208,11 +212,14 @@ function CheckoutForm({ pro, onClose }) {
 
       const bookingRef = doc(db, 'bookings', bookingId)
 
+      console.log('[CheckoutModal] Step 4: Running booking transaction...', bookingId)
+      console.log('[CheckoutModal] Step 4: Proof data size:', typeof proofData === 'string' ? (proofData.length / 1024).toFixed(1) + 'KB' : 'N/A')
       await runTransaction(db, async (transaction) => {
         const existingBooking = await transaction.get(bookingRef)
 
         if (existingBooking.exists()) {
           const existingData = existingBooking.data()
+          console.log('[CheckoutModal] Step 4: Existing booking found, status:', existingData.status, 'patientId:', existingData.patientId)
           if (ACTIVE_BOOKING_STATUSES.has(existingData.status)) {
             throw new Error('This time slot has already been booked. Please choose another.')
           }
@@ -220,17 +227,21 @@ function CheckoutForm({ pro, onClose }) {
 
         transaction.set(bookingRef, bookingData)
       })
+      console.log('[CheckoutModal] Step 4: Booking transaction SUCCESS')
 
       try {
+        console.log('[CheckoutModal] Step 5: Creating conversation...')
         await useChatStore
           .getState()
           .ensureConversation({ ...pro, uid: canonicalProId, professionalId: canonicalProId })
+        console.log('[CheckoutModal] Step 5: Conversation done')
       } catch (conversationError) {
-        console.error('[CheckoutModal] Conversation bootstrap failed:', conversationError)
+        console.error('[CheckoutModal] Step 5: Conversation bootstrap failed:', conversationError)
       }
 
       // 3. Create Notifications
       try {
+        console.log('[CheckoutModal] Step 6: Creating notifications...')
         // Notification for Professional
         await createNotification({
           userId: canonicalProId,
@@ -247,8 +258,8 @@ function CheckoutForm({ pro, onClose }) {
         // Notification for Patient
         await createNotification({
           userId: user.uid,
-          actorId: canonicalProId,
-          actorName: pro?.name || 'Specialist',
+          actorId: user.uid,
+          actorName: user.alias || user.name || 'Anonymous',
           type: 'booking',
           entityType: 'booking',
           entityId: bookingId,
@@ -256,8 +267,9 @@ function CheckoutForm({ pro, onClose }) {
           body: `Your session with ${pro?.name} is confirmed for ${new Date(selectedSlot.startsAt).toLocaleString()}.`,
           link: '/patient/bookings'
         });
+        console.log('[CheckoutModal] Step 6: Notifications done')
       } catch (notifError) {
-        console.error('[CheckoutModal] Notification failed:', notifError)
+        console.error('[CheckoutModal] Step 6: Notification failed:', notifError)
       }
 
       setSuccess(true)
@@ -268,7 +280,8 @@ function CheckoutForm({ pro, onClose }) {
         navigate('/patient/bookings')
       }, 1600)
     } catch (error) {
-      console.error('[CheckoutModal] Booking error:', error)
+      console.error('[CheckoutModal] BOOKING FAILED at step:', error)
+      console.error('[CheckoutModal] Error code:', error?.code, 'Message:', error?.message)
       setProcessing(false)
       alert(error?.message || 'There was an error processing your booking. Please try again.')
     }
