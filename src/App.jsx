@@ -12,6 +12,9 @@ import About from './pages/public/About';
 import SignIn from './pages/public/SignIn';
 import SignUp from './pages/public/SignUp';
 
+import VerifyEmail from './pages/public/VerifyEmail';
+import Onboarding from './pages/public/Onboarding';
+
 // Patient Pages
 import PatientDashboard from './pages/patient/PatientDashboard';
 import Directory from './pages/patient/Directory';
@@ -43,8 +46,16 @@ import Configuration from './pages/admin/Configuration';
 
 // Route Guards
 const ProtectedRoute = ({ children, allowedRole }) => {
-  const { isAuthenticated, role } = useAuthStore();
+  const { isAuthenticated, needsEmailVerification, pendingUser, role } = useAuthStore();
   const location = useLocation();
+
+  if (needsEmailVerification) {
+    return <Navigate to="/verify-email" state={{ from: location }} replace />;
+  }
+
+  if (pendingUser) {
+    return <Navigate to="/onboarding" state={{ from: location }} replace />;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/signin" state={{ from: location }} replace />;
@@ -104,6 +115,8 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/onboarding" element={<Onboarding />} />
 
         {/* Patient Portal */}
         <Route path="/patient" element={
