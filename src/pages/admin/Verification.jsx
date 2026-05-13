@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Filter, Shield, AlertCircle, CheckCircle, XCircle, User } from 'lucide-react';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, writeBatch, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { useAuthStore } from '../../stores/authStore';
 
 const Verification = () => {
   const [queue, setQueue] = useState([]);
@@ -15,7 +16,7 @@ const Verification = () => {
 
   const fetchQueue = async () => {
     try {
-      const q = query(collection(db, 'professionals'), where('verified', '==', false));
+      const q = query(collection(db, 'professionals'), where('approvalStatus', '==', 'pending'));
       const snaps = await getDocs(q);
       const pros = snaps.docs.map(d => ({ id: d.id, ...d.data() }));
       setQueue(pros);
@@ -32,12 +33,89 @@ const Verification = () => {
   const handleApprove = async (id) => {
     setActionLoading(true);
     try {
-      await updateDoc(doc(db, 'professionals', id), { verified: true });
+      const adminUser = useAuthStore.getState().user;
+      const batch = writeBatch(db);
+      
+      batch.update(doc(db, 'users', id), {
+        approvalStatus: "approved",
+        reviewedAt: serverTimestamp(),
+        reviewedBy: adminUser?.uid || "admin",
+        updatedAt: serverTimestamp()
+      });
+
+      batch.update(doc(db, 'professionals', id), {
+        approvalStatus: "approved",
+        verified: true,
+        reviewedAt: serverTimestamp(),
+        reviewedBy: adminUser?.uid || "admin",
+        rejectionReason: "",
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
+
+      await addDoc(collection(db, 'notifications'), {
+        userId: id,
+        type: "system",
+        title: "Professional application approved",
+        body: "Your professional account has been approved. You can now access your professional workspace.",
+        link: "/pro",
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
       setQueue(prev => prev.filter(p => p.id !== id));
       setSelectedPro(null);
     } catch (err) {
       console.error("Error verifying:", err);
       alert("Failed to verify professional.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReject = async (id) => {
+    const reason = window.prompt("Enter rejection reason:");
+    if (!reason) return;
+
+    setActionLoading(true);
+    try {
+      const adminUser = useAuthStore.getState().user;
+      const batch = writeBatch(db);
+
+      batch.update(doc(db, 'users', id), {
+        approvalStatus: "rejected",
+        reviewedAt: serverTimestamp(),
+        reviewedBy: adminUser?.uid || "admin",
+        updatedAt: serverTimestamp()
+      });
+
+      batch.update(doc(db, 'professionals', id), {
+        approvalStatus: "rejected",
+        verified: false,
+        reviewedAt: serverTimestamp(),
+        reviewedBy: adminUser?.uid || "admin",
+        rejectionReason: reason,
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
+
+      await addDoc(collection(db, 'notifications'), {
+        userId: id,
+        type: "system",
+        title: "Professional application not approved",
+        body: reason,
+        link: "/professional-rejected",
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
+      setQueue(prev => prev.filter(p => p.id !== id));
+      setSelectedPro(null);
+    } catch (err) {
+      console.error("Error rejecting:", err);
+      alert("Failed to reject professional.");
     } finally {
       setActionLoading(false);
     }
@@ -107,7 +185,11 @@ const Verification = () => {
                      <p className="text-text-secondary text-sm">{selectedPro.specialties?.join(', ') || 'Specialist'} • Applied {selectedPro.createdAt ? new Date(selectedPro.createdAt).toLocaleDateString() : 'Recently'}</p>
                    </div>
                    <div className="flex gap-2">
-                      <button className="flex items-center gap-1.5 px-4 py-2 border border-alert-coral text-alert-coral rounded-lg text-sm font-medium hover:bg-alert-coral/5 transition-colors">
+                      <button 
+                        onClick={() => handleReject(selectedPro.id)}
+                        disabled={actionLoading}
+                        className={`flex items-center gap-1.5 px-4 py-2 border border-alert-coral text-alert-coral rounded-lg text-sm font-medium hover:bg-alert-coral/5 transition-colors ${actionLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
                         <XCircle className="w-4 h-4" /> Reject
                       </button>
                       <button 
@@ -137,6 +219,24 @@ const Verification = () => {
                               <div>
                                 <p className="text-xs text-text-muted">Role</p>
                                 <p className="text-sm font-medium capitalize">{selectedPro.role}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-text-muted">Specialties</p>
+                                <p className="text-sm font-medium">{selectedPro.specialties?.join(', ') || 'None specified'}</p>
+                              </div>
+                              {selectedPro.languages && (
+                                <div>
+                                  <p className="text-xs text-text-muted">Languages</p>
+                                  <p className="text-sm font-medium">{selectedPro.languages?.join(', ')}</p>
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-xs text-text-muted">Applied On</p>
+                                <p className="text-sm font-medium">{selectedPro.submittedAt ? new Date(selectedPro.submittedAt).toLocaleDateString() : selectedPro.createdAt ? new Date(selectedPro.createdAt).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-text-muted">Status</p>
+                                <p className="text-sm font-medium capitalize">{selectedPro.approvalStatus || 'pending'}</p>
                               </div>
                            </div>
                          </div>

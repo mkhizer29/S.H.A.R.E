@@ -8,6 +8,7 @@ import {
   updateDoc,
   setDoc,
   query,
+  where,
   orderBy
 } from 'firebase/firestore'
 
@@ -37,7 +38,12 @@ export const useProStore = create((set) => ({
     set({ isLoading: true, error: null })
 
     try {
-      const q = query(collection(db, 'professionals'), orderBy('rating', 'desc'))
+      const q = query(
+        collection(db, 'professionals'), 
+        where('approvalStatus', '==', 'approved'),
+        where('verified', '==', true),
+        orderBy('rating', 'desc')
+      )
       const snapshot = await getDocs(q)
       const pros = snapshot.docs.map(normalizeProfessional)
 
@@ -76,8 +82,15 @@ export const useProStore = create((set) => ({
         updates.professionalId ||
         (typeof id === 'string' && id.length >= 20 ? id : null)
 
+      const safeUpdates = { ...updates }
+      const protectedFields = [
+        'verified', 'approvalStatus', 'reviewedAt', 'reviewedBy', 
+        'rejectionReason', 'role', 'rating', 'reviewCount', 'sessionCount'
+      ]
+      protectedFields.forEach(field => delete safeUpdates[field])
+
       const payload = {
-        ...updates,
+        ...safeUpdates,
         ...(canonicalUid
           ? {
             uid: canonicalUid,

@@ -14,9 +14,22 @@ service cloud.firestore {
       return signedIn() && get(/databases/$(database)/documents/admin_access/$(request.auth.uid)).data.isActive == true;
     }
 
+    function isApprovedProfessional(userId) {
+      return signedIn() && 
+             exists(/databases/$(database)/documents/users/$(userId)) &&
+             get(/databases/$(database)/documents/users/$(userId)).data.role == "professional" &&
+             get(/databases/$(database)/documents/users/$(userId)).data.approvalStatus == "approved";
+    }
+
+    function isApprovedProfessionalDoc(proId) {
+      return exists(/databases/$(database)/documents/professionals/$(proId)) &&
+             get(/databases/$(database)/documents/professionals/$(proId)).data.approvalStatus == "approved" &&
+             get(/databases/$(database)/documents/professionals/$(proId)).data.verified == true;
+    }
+
     match /admin_access/{userId} {
       allow read: if self(userId);
-      allow write: if false; // Must be managed from Firebase Console
+      allow write: if false; 
     }
 
     match /payment_proofs/{proofId} {
@@ -26,28 +39,39 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
+      allow read: if self(userId) || isAdmin();
+      
       allow create: if self(userId)
-                    && request.resource.data.keys().hasOnly([
-                      'email',
-                      'alias',
-                      'role',
-                      'publicKey',
-                      'createdAt'
-                    ])
-                    && request.resource.data.email is string
-                    && request.resource.data.alias is string
-                    && request.resource.data.role is string
-                    && request.resource.data.role in ['patient', 'professional', 'admin']
-                    && request.resource.data.publicKey is string
-                    && request.resource.data.createdAt is string;
+        && request.resource.data.keys().hasOnly([
+          'email',
+          'alias',
+          'role',
+          'publicKey',
+          'approvalStatus',
+          'onboardingComplete',
+          'createdAt'
+        ])
+        && request.resource.data.email is string
+        && request.resource.data.alias is string
+        && request.resource.data.role in ['patient', 'professional']
+        && request.resource.data.publicKey is string
+        && request.resource.data.approvalStatus in ['pending', 'approved', 'rejected']
+        && request.resource.data.onboardingComplete is bool
+        && request.resource.data.createdAt is string
+        && (
+             (request.resource.data.role == 'patient' && request.resource.data.approvalStatus == 'approved') ||
+             (request.resource.data.role == 'professional' && request.resource.data.approvalStatus == 'pending')
+           );
 
-      allow read: if signedIn(); // Allows querying by alias
-      allow update: if self(userId) || isAdmin();
+      allow update: if (self(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['alias', 'updatedAt']))
+        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvalStatus', 'reviewedAt', 'reviewedBy', 'updatedAt']) 
+            && request.resource.data.approvalStatus in ['pending', 'approved', 'rejected']);
+            
       allow delete: if false;
     }
 
     match /bookings/{bookingId} {
-      allow create: if signedIn();
+      allow create: if signedIn() && isApprovedProfessionalDoc(request.resource.data.professionalId);
       allow read: if signedIn();
       allow update: if isAdmin() || (
         signedIn() && (
@@ -63,9 +87,28 @@ service cloud.firestore {
     }
 
     match /professionals/{proId} {
-      allow read: if true;
-      allow create: if self(proId);
-      allow update: if self(proId) || isAdmin();
+      allow read: if self(proId) || isAdmin() || (resource.data.approvalStatus == "approved" && resource.data.verified == true);
+      
+      allow create: if self(proId)
+        && request.resource.data.approvalStatus == "pending"
+        && request.resource.data.verified == false
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.professionalId == request.auth.uid;
+        
+      allow update: if (self(proId) 
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'title', 'about', 'specialties', 'languages', 'uid', 'userId', 'professionalId', 'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.professionalId == request.auth.uid)
+        || (isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'approvalStatus', 'verified', 'reviewedAt', 'reviewedBy', 'rejectionReason', 'updatedAt'
+        ])
+        && request.resource.data.approvalStatus in ['pending', 'approved', 'rejected']);
+
       allow delete: if false;
 
       match /notes/{patientId} {
@@ -75,21 +118,20 @@ service cloud.firestore {
     }
 
     match /moods/{moodId} {
-      allow create: if signedIn()
-                    && request.resource.data.userId == request.auth.uid;
-      allow read, update: if signedIn()
-                          && resource.data.userId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update: if signedIn() && resource.data.userId == request.auth.uid;
       allow delete: if false;
     }
 
     match /conversations/{conversationId} {
       allow create: if signedIn()
-                    && request.resource.data.patientUid is string
-                    && request.resource.data.proUid is string
-                    && (
-                      request.resource.data.patientUid == request.auth.uid ||
-                      request.resource.data.proUid == request.auth.uid
-                    );
+        && request.resource.data.patientUid is string
+        && request.resource.data.proUid is string
+        && (
+          request.resource.data.patientUid == request.auth.uid ||
+          request.resource.data.proUid == request.auth.uid
+        )
+        && isApprovedProfessionalDoc(request.resource.data.proUid);
 
       allow read, update: if signedIn() &&
         (
@@ -101,17 +143,17 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow create: if signedIn()
-                      && request.resource.data.senderId == request.auth.uid
-                      && (
-                        get(/databases/$(database)/documents/conversations/$(conversationId)).data.patientUid == request.auth.uid ||
-                        get(/databases/$(database)/documents/conversations/$(conversationId)).data.proUid == request.auth.uid
-                      );
+          && request.resource.data.senderId == request.auth.uid
+          && (
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data.patientUid == request.auth.uid ||
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data.proUid == request.auth.uid
+          );
 
         allow read, update: if signedIn()
-                            && (
-                              get(/databases/$(database)/documents/conversations/$(conversationId)).data.patientUid == request.auth.uid ||
-                              get(/databases/$(database)/documents/conversations/$(conversationId)).data.proUid == request.auth.uid
-                            );
+          && (
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data.patientUid == request.auth.uid ||
+            get(/databases/$(database)/documents/conversations/$(conversationId)).data.proUid == request.auth.uid
+          );
 
         allow delete: if false;
       }
@@ -120,28 +162,29 @@ service cloud.firestore {
     match /availability/{availabilityId} {
       allow read: if true;
       allow create: if signedIn()
-                    && request.resource.data.professionalId == request.auth.uid;
-      allow update, delete: if signedIn()
-                    && resource.data.professionalId == request.auth.uid;
+        && request.resource.data.professionalId == request.auth.uid
+        && isApprovedProfessional(request.auth.uid);
+      allow update: if signedIn()
+        && resource.data.professionalId == request.auth.uid
+        && isApprovedProfessional(request.auth.uid)
+        && request.resource.data.professionalId == resource.data.professionalId;
+      allow delete: if signedIn()
+        && resource.data.professionalId == request.auth.uid
+        && isApprovedProfessional(request.auth.uid);
     }
 
     match /notifications/{notificationId} {
       allow create: if signedIn()
-                    && request.resource.data.userId is string
-                    && request.resource.data.type is string
-                    && request.resource.data.title is string
-                    && request.resource.data.body is string
-                    && request.resource.data.link is string
-                    && request.resource.data.read is bool;
+        && request.resource.data.userId is string
+        && request.resource.data.type is string
+        && request.resource.data.title is string
+        && request.resource.data.body is string
+        && request.resource.data.link is string
+        && request.resource.data.read is bool;
 
-      allow read: if signedIn()
-                  && resource.data.userId == request.auth.uid;
-
-      allow update: if signedIn()
-                    && resource.data.userId == request.auth.uid;
-
-      allow delete: if signedIn()
-                    && resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow update: if signedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
     }
   }
 }

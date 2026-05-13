@@ -44,11 +44,17 @@ const Profile = () => {
   };
 
   const handleSave = async () => {
-    const success = await updateProProfile(user.uid, { 
-      ...profileData, 
+    const payload = {
+      name: profileData.name,
+      title: profileData.title,
+      about: profileData.about,
+      specialties: profileData.specialties,
       uid: user.uid,
-      userId: user.uid 
-    });
+      userId: user.uid,
+      professionalId: user.uid
+    };
+
+    const success = await updateProProfile(user.uid, payload);
     if (success) {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);

@@ -7,9 +7,8 @@ const Footer = () => {
     <footer className="bg-text-primary text-warm-white py-12 px-6">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex flex-col items-center md:items-start">
-          <div className="flex items-center space-x-2 text-sage-light mb-4">
-            <Shield className="w-6 h-6" />
-            <span className="font-serif text-xl">SHARE</span>
+          <div className="flex items-center mb-4 bg-white/90 p-2 rounded-xl">
+            <img src="/logo.jpg" alt="SHARE Logo" className="h-8 object-contain" />
           </div>
           <p className="text-text-muted text-sm text-center md:text-left max-w-sm">
             End-to-end encrypted, fully anonymous mental health support. Your privacy is our priority.

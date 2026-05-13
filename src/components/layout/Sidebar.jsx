@@ -50,11 +50,8 @@ export default function Sidebar() {
     <aside className="sidebar w-[260px] h-screen bg-surface border-r border-neutral-200 flex flex-col pt-2">
       {/* Logo */}
       <div className="px-6 py-6 pb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-light rounded-[14px] flex items-center justify-center">
-            <Shield size={20} className="text-primary" />
-          </div>
-          <span className="text-xl font-semibold text-neutral-900 tracking-tight">SHARE</span>
+        <div className="flex items-center">
+          <img src="/logo.jpg" alt="SHARE Logo" className="h-10 object-contain mix-blend-multiply" />
         </div>
       </div>
 

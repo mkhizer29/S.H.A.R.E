@@ -38,9 +38,8 @@ export default function Onboarding() {
     }
 
     try {
-      await completeOnboarding(alias.trim(), selectedRole)
-      const target = selectedRole === 'patient' ? '/patient' : '/pro'
-      navigate(target, { replace: true })
+      const result = await completeOnboarding(alias.trim(), selectedRole)
+      navigate(result.redirectTo, { replace: true })
     } catch (err) {
       setError(err.message || 'Failed to complete profile. Please try again.')
     }
@@ -87,6 +86,43 @@ export default function Onboarding() {
             disabled={isLoading}
           />
 
+          <div className="space-y-3">
+            <label className="text-[13px] font-bold text-neutral-400 uppercase tracking-wide ml-1">Account Type</label>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedRole('patient')}
+                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                  selectedRole === 'patient' 
+                    ? 'border-violet-500 bg-violet-50 ring-4 ring-violet-500/10' 
+                    : 'border-neutral-200 bg-white hover:border-violet-200 hover:bg-neutral-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`font-bold ${selectedRole === 'patient' ? 'text-violet-700' : 'text-neutral-900'}`}>Patient</span>
+                  {selectedRole === 'patient' && <Check size={18} className="text-violet-600" />}
+                </div>
+                <p className="text-sm font-medium text-text-muted">I want support from professionals.</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedRole('professional')}
+                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                  selectedRole === 'professional' 
+                    ? 'border-violet-500 bg-violet-50 ring-4 ring-violet-500/10' 
+                    : 'border-neutral-200 bg-white hover:border-violet-200 hover:bg-neutral-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`font-bold ${selectedRole === 'professional' ? 'text-violet-700' : 'text-neutral-900'}`}>Professional</span>
+                  {selectedRole === 'professional' && <Check size={18} className="text-violet-600" />}
+                </div>
+                <p className="text-sm font-medium text-text-muted">I want to provide support. Requires admin approval.</p>
+              </button>
+            </div>
+          </div>
+
           <motion.button
             whileTap={{ scale: 0.98 }}
             type="submit"
@@ -94,7 +130,9 @@ export default function Onboarding() {
             className={`w-full py-4 bg-violet-600 text-white rounded-2xl font-bold text-[16px] hover:bg-violet-700 shadow-soft transition-colors mt-2 flex items-center justify-center gap-3 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
             {isLoading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-            {isLoading ? 'Generating keys...' : 'Complete Registration'}
+            {isLoading 
+              ? (selectedRole === 'professional' ? 'Submitting application...' : 'Generating keys...') 
+              : (selectedRole === 'professional' ? 'Submit for Review' : 'Complete Registration')}
           </motion.button>
         </form>
 

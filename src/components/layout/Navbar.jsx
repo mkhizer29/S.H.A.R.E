@@ -33,11 +33,8 @@ export default function Navbar() {
     <nav className="sticky top-0 left-0 right-0 z-50 bg-surface-warm/80 backdrop-blur-xl border-b border-lilac-100/50">
       <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 bg-primary-light rounded-xl flex items-center justify-center shadow-inner-soft group-hover:-translate-y-0.5 transition-transform">
-            <Shield size={20} className="text-primary" />
-          </div>
-          <span className="text-xl font-bold text-neutral-900 tracking-tight">SHARE</span>
+        <Link to="/" className="flex items-center group">
+          <img src="/logo.jpg" alt="SHARE Logo" className="h-10 object-contain group-hover:-translate-y-0.5 transition-transform mix-blend-multiply" />
         </Link>
 
         {/* Desktop Nav */}

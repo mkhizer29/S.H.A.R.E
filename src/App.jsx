@@ -14,6 +14,8 @@ import SignUp from './pages/public/SignUp';
 
 import VerifyEmail from './pages/public/VerifyEmail';
 import Onboarding from './pages/public/Onboarding';
+import ProfessionalPending from './pages/public/ProfessionalPending';
+import ProfessionalRejected from './pages/public/ProfessionalRejected';
 
 // Patient Pages
 import PatientDashboard from './pages/patient/PatientDashboard';
@@ -46,7 +48,7 @@ import Configuration from './pages/admin/Configuration';
 
 // Route Guards
 const ProtectedRoute = ({ children, allowedRole }) => {
-  const { isAuthenticated, needsEmailVerification, pendingUser, role } = useAuthStore();
+  const { isAuthenticated, needsEmailVerification, pendingUser, role, user } = useAuthStore();
   const location = useLocation();
 
   if (needsEmailVerification) {
@@ -61,7 +63,35 @@ const ProtectedRoute = ({ children, allowedRole }) => {
     return <Navigate to="/signin" state={{ from: location }} replace />;
   }
 
+  const approvalStatus =
+    role === 'professional'
+      ? user?.approvalStatus || (user?.verified ? 'approved' : 'pending')
+      : null;
+
+  if (role === 'professional' && approvalStatus === 'pending') {
+    if (location.pathname !== '/professional-pending') {
+      return <Navigate to="/professional-pending" replace />;
+    }
+  }
+
+  if (role === 'professional' && approvalStatus === 'rejected') {
+    if (location.pathname !== '/professional-rejected') {
+      return <Navigate to="/professional-rejected" replace />;
+    }
+  }
+
   if (allowedRole && role !== allowedRole) {
+    const getWorkspaceRoute = () => {
+      if (role === 'patient') return '/patient'
+      if (role === 'admin') return '/admin'
+      if (role === 'professional') {
+        if (approvalStatus === 'approved') return '/pro'
+        if (approvalStatus === 'rejected') return '/professional-rejected'
+        return '/professional-pending'
+      }
+      return '/'
+    }
+
     return (
       <div className="min-h-screen bg-lilac-50 flex items-center justify-center p-6 text-center font-sans">
         <div className="max-w-md w-full bg-white rounded-[2.5rem] p-10 shadow-soft border border-lilac-100">
@@ -74,7 +104,7 @@ const ProtectedRoute = ({ children, allowedRole }) => {
             This area is reserved for {allowedRole}s.
           </p>
           <div className="flex flex-col gap-3">
-             <Navigate to={role === 'patient' ? '/patient' : role === 'professional' ? '/pro' : '/admin'} replace />
+             <Navigate to={getWorkspaceRoute()} replace />
              <p className="text-xs text-neutral-400 animate-pulse">Redirecting to your workspace...</p>
           </div>
         </div>
@@ -117,6 +147,8 @@ function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/professional-pending" element={<ProfessionalPending />} />
+        <Route path="/professional-rejected" element={<ProfessionalRejected />} />
 
         {/* Patient Portal */}
         <Route path="/patient" element={

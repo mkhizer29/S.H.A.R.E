@@ -45,7 +45,12 @@ export default function SignUp() {
         navigate('/onboarding', { replace: true })
       } else if (result.user) {
         const state = useAuthStore.getState()
-        const target = from || (state.role === 'patient' ? '/patient' : state.role === 'professional' ? '/pro' : '/admin')
+        let target = result.redirectTo || '/patient'
+        
+        if (from && state.role !== 'professional') {
+          target = from
+        }
+        
         navigate(target, { replace: true })
       }
     } catch (err) {
@@ -62,11 +67,10 @@ export default function SignUp() {
         <div className="absolute top-0 right-[-10%] w-64 h-64 bg-plum-500/40 rounded-full blur-[80px]" />
         <div className="absolute bottom-[-10%] left-[-10%] w-48 h-48 bg-sage-400/40 rounded-full blur-[60px]" />
         <div className="relative z-10 text-white">
-          <Link to="/" className="flex items-center gap-3 mb-16 group">
-            <div className="w-10 h-10 bg-white/20 rounded-[12px] flex items-center justify-center backdrop-blur-md group-hover:scale-105 transition-transform">
-              <Shield size={20} className="text-white" />
+          <Link to="/" className="flex items-center mb-16 group">
+            <div className="bg-white p-2 rounded-xl group-hover:scale-105 transition-transform shadow-sm">
+              <img src="/logo.jpg" alt="SHARE Logo" className="h-8 object-contain" />
             </div>
-            <span className="text-2xl font-bold tracking-tight">SHARE</span>
           </Link>
           <h2 className="text-4xl lg:text-5xl font-semibold mb-6 tracking-tight leading-[1.1]">Join<br/>us today.</h2>
           <p className="text-violet-100 text-lg leading-relaxed mb-10 font-medium max-w-sm">
@@ -93,11 +97,8 @@ export default function SignUp() {
           className="w-full max-w-md relative z-10"
         >
           {/* Mobile logo */}
-          <Link to="/" className="flex items-center gap-3 mb-10 lg:hidden group">
-            <div className="w-10 h-10 bg-violet-100 rounded-[12px] flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Shield size={20} className="text-violet-600" />
-            </div>
-            <span className="text-2xl font-bold tracking-tight text-text-main">SHARE</span>
+          <Link to="/" className="flex items-center mb-10 lg:hidden group">
+            <img src="/logo.jpg" alt="SHARE Logo" className="h-10 object-contain group-hover:scale-105 transition-transform mix-blend-multiply" />
           </Link>
 
           <h1 className="text-[32px] font-semibold text-text-main mb-3 tracking-tight">Create an account</h1>
