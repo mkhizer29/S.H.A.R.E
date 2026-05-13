@@ -98,6 +98,55 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /professional_profile_change_requests/{requestId} {
+      allow create: if signedIn()
+                    && isApprovedProfessional(request.auth.uid)
+                    && request.resource.data.professionalId == request.auth.uid
+                    && request.resource.data.status == "pending"
+                    && request.resource.data.requestedSpecialties is list
+                    && request.resource.data.requestedLanguages is list
+                    && request.resource.data.requestedPricePerSession is number
+                    && request.resource.data.requestedPricePerSession >= 0
+                    && request.resource.data.requestedPricePerSession <= 100000
+                    && request.resource.data.requestedCurrency is string
+                    && request.resource.data.requestedCurrency in ["PKR"]
+                    && request.resource.data.keys().hasOnly([
+                      "professionalId",
+                      "professionalName",
+                      "professionalEmail",
+                      "requestedSpecialties",
+                      "requestedLanguages",
+                      "requestedPricePerSession",
+                      "requestedCurrency",
+                      "currentSpecialties",
+                      "currentLanguages",
+                      "currentPricePerSession",
+                      "currentCurrency",
+                      "status",
+                      "submittedAt",
+                      "reviewedAt",
+                      "reviewedBy",
+                      "rejectionReason"
+                    ]);
+
+      allow read: if signedIn()
+                  && (
+                    resource.data.professionalId == request.auth.uid ||
+                    isAdmin()
+                  );
+
+      allow update: if isAdmin()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      "status",
+                      "reviewedAt",
+                      "reviewedBy",
+                      "rejectionReason"
+                    ])
+                    && request.resource.data.status in ["pending", "approved", "rejected"];
+
+      allow delete: if false;
+    }
+
     match /professionals/{proId} {
       allow read: if self(proId) || isAdmin() || (resource.data.approvalStatus == "approved" && resource.data.verified == true);
       
@@ -110,14 +159,14 @@ service cloud.firestore {
         
       allow update: if (self(proId) 
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'name', 'title', 'about', 'specialties', 'languages', 'uid', 'userId', 'professionalId', 'updatedAt'
+          'name', 'title', 'about', 'uid', 'userId', 'professionalId', 'updatedAt'
         ])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.professionalId == request.auth.uid)
         || (isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'approvalStatus', 'verified', 'reviewedAt', 'reviewedBy', 'rejectionReason', 'updatedAt'
+          'approvalStatus', 'verified', 'reviewedAt', 'reviewedBy', 'rejectionReason', 'specialties', 'languages', 'pricePerSession', 'currency', 'updatedAt'
         ])
         && request.resource.data.approvalStatus in ['pending', 'approved', 'rejected']);
 

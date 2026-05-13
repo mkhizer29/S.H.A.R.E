@@ -1,41 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, ShieldCheck, CheckCircle, Award, BookOpen, User, Loader2, Save } from 'lucide-react';
+import { Camera, ShieldCheck, CheckCircle, Award, BookOpen, User, Loader2, Save, Info } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { useProStore } from '../../stores/proStore';
+import { SPECIALTIES, LANGUAGES } from '../../utils/constants';
+import { useProfileChangeRequestStore } from '../../stores/profileChangeRequestStore';
 
 const Profile = () => {
   const { user } = useAuthStore();
   const { updateProProfile, fetchProById, isLoading } = useProStore();
+  const { 
+    myPendingRequest, 
+    fetchMyPendingRequest, 
+    submitProfileChangeRequest, 
+    isLoading: isRequestLoading 
+  } = useProfileChangeRequestStore();
+
   const [profileData, setProfileData] = useState({
     name: '',
     title: '',
     about: '',
     specialties: [],
+    languages: ["English"],
+    pricePerSession: 3000,
+    currency: "PKR",
     verified: false,
   });
+
+  const [requestedSpecialties, setRequestedSpecialties] = useState([]);
+  const [requestedLanguages, setRequestedLanguages] = useState([]);
+  const [requestedPricePerSession, setRequestedPricePerSession] = useState(3000);
+  const [requestedCurrency, setRequestedCurrency] = useState('PKR');
+
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
 
   useEffect(() => {
     if (user?.uid) {
       loadProfile();
+      fetchMyPendingRequest(user.uid);
     }
   }, [user?.uid]);
 
   const loadProfile = async () => {
     const data = await fetchProById(user.uid);
     if (data) {
+      const sp = data.specialties || [];
+      const lang = data.languages || ["English"];
+      const price = Number(data.pricePerSession || 3000);
+      const curr = data.currency || "PKR";
+
       setProfileData({
         name: data.name || user.name || '',
         title: data.title || '',
         about: data.about || '',
-        specialties: data.specialties || [],
+        specialties: sp,
+        languages: lang,
+        pricePerSession: price,
+        currency: curr,
         verified: data.verified || false,
       });
+
+      setRequestedSpecialties(sp);
+      setRequestedLanguages(lang);
+      setRequestedPricePerSession(price);
+      setRequestedCurrency(curr);
     } else {
-      // Set defaults from user object if profile doesn't exist
       setProfileData(prev => ({
         ...prev,
         name: user.name || user.alias || '',
@@ -48,7 +80,6 @@ const Profile = () => {
       name: profileData.name,
       title: profileData.title,
       about: profileData.about,
-      specialties: profileData.specialties,
       uid: user.uid,
       userId: user.uid,
       professionalId: user.uid
@@ -61,21 +92,49 @@ const Profile = () => {
     }
   };
 
-  const handleAddSpecialty = () => {
-    const specialty = prompt('Enter a new specialty:');
-    if (specialty && !profileData.specialties.includes(specialty)) {
-      setProfileData({
-        ...profileData,
-        specialties: [...profileData.specialties, specialty],
-      });
+  const handleSubmitProfileRequest = async () => {
+    if (requestedSpecialties.length === 0) {
+      alert("Please select at least one specialty.");
+      return;
+    }
+    if (requestedLanguages.length === 0) {
+      alert("Please select at least one language.");
+      return;
+    }
+    if (requestedPricePerSession < 0 || requestedPricePerSession > 100000 || isNaN(requestedPricePerSession)) {
+      alert("Please enter a valid session fee between 0 and 100000.");
+      return;
+    }
+
+    const success = await submitProfileChangeRequest({
+      user,
+      currentProfile: profileData,
+      requestedSpecialties,
+      requestedLanguages,
+      requestedPricePerSession,
+      requestedCurrency
+    });
+
+    if (success) {
+      setRequestSuccess(true);
+      setTimeout(() => setRequestSuccess(false), 3000);
+      await fetchMyPendingRequest(user.uid);
     }
   };
 
-  const handleRemoveSpecialty = (tag) => {
-    setProfileData({
-      ...profileData,
-      specialties: profileData.specialties.filter(t => t !== tag),
-    });
+  const hasChangesToRequest = () => {
+    if (requestedSpecialties.length !== profileData.specialties.length) return true;
+    const sameSpecialties = requestedSpecialties.every(s => profileData.specialties.includes(s));
+    if (!sameSpecialties) return true;
+
+    if (requestedLanguages.length !== profileData.languages.length) return true;
+    const sameLanguages = requestedLanguages.every(l => profileData.languages.includes(l));
+    if (!sameLanguages) return true;
+
+    if (requestedPricePerSession !== profileData.pricePerSession) return true;
+    if (requestedCurrency !== profileData.currency) return true;
+
+    return false;
   };
 
   const containerVariants = {
@@ -229,26 +288,130 @@ const Profile = () => {
             </div>
           </section>
 
-          {/* Expertise */}
+          {/* Expertise & Services */}
           <section className="bg-surface rounded-[32px] border border-neutral-200 shadow-soft p-8 md:p-10 space-y-8">
             <div className="flex items-center gap-4 mb-2">
               <div className="w-10 h-10 bg-accent-light rounded-xl flex items-center justify-center text-accent-hover">
                 <Award size={20} />
               </div>
-              <h3 className="text-xl font-bold text-neutral-900 tracking-tight">Areas of Expertise</h3>
+              <h3 className="text-xl font-bold text-neutral-900 tracking-tight">Expertise & Services</h3>
             </div>
             
-            <div className="pt-2">
-              <div className="flex flex-wrap gap-3">
-                 {profileData.specialties.map((tag) => (
-                   <div key={tag} className="bg-white border border-neutral-100 text-neutral-900 px-4 py-2 rounded-xl text-[14px] font-bold flex items-center gap-2 shadow-sm group hover:border-primary transition-colors cursor-default">
-                     {tag}
-                     <button onClick={() => handleRemoveSpecialty(tag)} className="text-neutral-300 hover:text-alert transition-colors font-sans text-lg leading-none">&times;</button>
-                   </div>
-                 ))}
-                 <button onClick={handleAddSpecialty} className="bg-surface-tinted border border-dashed border-neutral-300 text-neutral-500 hover:text-primary hover:border-primary px-4 py-2 rounded-xl text-[14px] font-bold transition-all flex items-center gap-2">
-                   + Add Specialty
-                 </button>
+            {myPendingRequest ? (
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 flex items-start gap-3">
+                <Info className="text-primary mt-0.5 shrink-0" size={20} />
+                <div>
+                  <h4 className="font-bold text-primary">Profile update pending admin review</h4>
+                  <p className="text-sm text-neutral-600 mt-1">Your requested changes to specialties, languages, and fees are currently being reviewed by an admin. You cannot submit another request until this one is processed.</p>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="space-y-6">
+              <div>
+                <label className="text-[13px] font-bold text-neutral-400 uppercase tracking-wide ml-1 mb-3 block">Live approved expertise</label>
+                <div className="flex flex-wrap gap-2">
+                  {profileData.specialties.map(tag => (
+                    <div key={tag} className="bg-neutral-100 text-neutral-600 px-3 py-1.5 rounded-lg text-[13px] font-bold">
+                      {tag}
+                    </div>
+                  ))}
+                  {profileData.specialties.length === 0 && <span className="text-sm text-neutral-400">No specialties approved yet.</span>}
+                </div>
+              </div>
+
+              <div className="border-t border-neutral-100 pt-6">
+                <label className="text-[13px] font-bold text-neutral-400 uppercase tracking-wide ml-1 mb-3 block">Request expertise changes</label>
+                <div className="flex flex-wrap gap-2">
+                  <button 
+                    onClick={() => {
+                      if (requestedSpecialties.length === SPECIALTIES.length) {
+                        setRequestedSpecialties([]);
+                      } else {
+                        setRequestedSpecialties([...SPECIALTIES]);
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-xl text-[14px] font-bold transition-all border ${requestedSpecialties.length === SPECIALTIES.length ? 'bg-primary text-white border-primary' : 'bg-white text-neutral-600 border-neutral-200 hover:border-primary/50'}`}
+                  >
+                    All
+                  </button>
+                  {SPECIALTIES.map(tag => {
+                    const isSelected = requestedSpecialties.includes(tag);
+                    return (
+                      <button 
+                        key={tag}
+                        onClick={() => {
+                          if (isSelected) {
+                            setRequestedSpecialties(requestedSpecialties.filter(s => s !== tag));
+                          } else {
+                            setRequestedSpecialties([...requestedSpecialties, tag]);
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-xl text-[14px] font-bold transition-all border ${isSelected ? 'bg-primary text-white border-primary' : 'bg-white text-neutral-600 border-neutral-200 hover:border-primary/50'}`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="border-t border-neutral-100 pt-6">
+                <label className="text-[13px] font-bold text-neutral-400 uppercase tracking-wide ml-1 mb-3 block">Languages you offer</label>
+                <div className="flex flex-wrap gap-2">
+                  {LANGUAGES.map(lang => {
+                    const isSelected = requestedLanguages.includes(lang);
+                    return (
+                      <button 
+                        key={lang}
+                        onClick={() => {
+                          if (isSelected) {
+                            setRequestedLanguages(requestedLanguages.filter(l => l !== lang));
+                          } else {
+                            setRequestedLanguages([...requestedLanguages, lang]);
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-xl text-[14px] font-bold transition-all border ${isSelected ? 'bg-primary text-white border-primary' : 'bg-white text-neutral-600 border-neutral-200 hover:border-primary/50'}`}
+                      >
+                        {lang}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="border-t border-neutral-100 pt-6">
+                <label className="text-[13px] font-bold text-neutral-400 uppercase tracking-wide ml-1 mb-3 block">Session Fee (PKR)</label>
+                <div className="space-y-2 max-w-xs">
+                  <input 
+                    type="number" 
+                    min="0"
+                    max="100000"
+                    value={requestedPricePerSession}
+                    onChange={(e) => setRequestedPricePerSession(Number(e.target.value))}
+                    className="w-full bg-surface-tinted border border-neutral-200 rounded-xl py-3 px-4 text-[15px] font-medium focus:outline-none focus:border-primary transition-all"
+                  />
+                  <p className="text-[12px] text-neutral-500 font-medium">Fee changes require admin approval before patients see them.</p>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end gap-4 items-center">
+                {requestSuccess && (
+                  <span className="text-green-500 font-bold text-sm flex items-center gap-1">
+                    <CheckCircle size={16} /> Request Submitted
+                  </span>
+                )}
+                {!hasChangesToRequest() && !myPendingRequest && (
+                  <span className="text-neutral-400 text-sm font-medium">No reviewed profile changes to submit.</span>
+                )}
+                <Button 
+                  onClick={handleSubmitProfileRequest} 
+                  loading={isRequestLoading}
+                  disabled={myPendingRequest !== null || !hasChangesToRequest()}
+                  className="px-6 py-2.5 !rounded-xl shadow-sm"
+                >
+                  Submit Changes for Review
+                </Button>
               </div>
             </div>
           </section>

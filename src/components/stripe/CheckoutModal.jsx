@@ -19,12 +19,24 @@ import {
   serverTimestamp,
   where
 } from 'firebase/firestore'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { db, storage } from '../../lib/firebase'
+import { db } from '../../lib/firebase'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatStore } from '../../stores/chatStore'
 import { getAvailableSlots, resolveProId } from '../../utils/slotUtils'
 import { createNotification } from '../../stores/notificationStore'
+
+const MAX_PROOF_FILE_SIZE = 500 * 1024
+
+const fileToDataUrl = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(new Error('Failed to read payment proof file.'))
+
+    reader.readAsDataURL(file)
+  })
+}
 
 const ACTIVE_BOOKING_STATUSES = new Set(['upcoming', 'confirmed', 'active', 'in_progress'])
 
@@ -74,8 +86,8 @@ function CheckoutForm({ pro, onClose }) {
         } catch (slotErr) {
           console.warn('[CheckoutModal] Slot load warning:', slotErr)
           if (!alive) return
-          setSlotError(slotErr?.message?.includes('permission') 
-            ? 'This professional\'s availability is currently restricted. They may need to finalize their profile setup.' 
+          setSlotError(slotErr?.message?.includes('permission')
+            ? 'This professional\'s availability is currently restricted. They may need to finalize their profile setup.'
             : (slotErr?.message || 'No available slots found.'))
           setAvailableDays([])
         }
@@ -117,6 +129,11 @@ function CheckoutForm({ pro, onClose }) {
       return
     }
 
+    if (proofFile.size > MAX_PROOF_FILE_SIZE) {
+      alert('Payment proof is too large. Please upload an image/PDF under 500 KB. Crop or compress it and try again.')
+      return
+    }
+
     setProcessing(true)
 
     try {
@@ -151,15 +168,15 @@ function CheckoutForm({ pro, onClose }) {
       const bookingId = buildBookingId(canonicalProId, startsAtIso)
 
       const proofId = `proof_${Date.now()}_${Math.floor(Math.random() * 1000000)}`
-      let fileUrl = ''
-      
+      let proofDataUrl = ''
+
       try {
-        const storageRef = ref(storage, `payment_proofs/${proofId}`)
-        await uploadBytes(storageRef, proofFile)
-        fileUrl = await getDownloadURL(storageRef)
+        console.log('[CheckoutModal] Step 3.5: Reading payment proof as base64...')
+        proofDataUrl = await fileToDataUrl(proofFile)
+        console.log('[CheckoutModal] Step 3.6: Payment proof converted to base64')
       } catch (err) {
-        console.error('[CheckoutModal] Storage upload failed:', err)
-        throw new Error('Failed to upload payment proof. Please try again.')
+        console.error('[CheckoutModal] Proof read failed:', err)
+        throw new Error('Failed to read payment proof file. Please try again.')
       }
 
       const specialty = getSpecialtyLabel(pro)
@@ -177,7 +194,7 @@ function CheckoutForm({ pro, onClose }) {
         amount: Number(pro?.pricePerSession || 3000),
         currency: pro?.currency || 'PKR',
         paymentMethod: 'bank_transfer',
-        paymentProofId: proofId, 
+        paymentProofId: proofId,
         createdAt: serverTimestamp()
       }
 
@@ -188,7 +205,10 @@ function CheckoutForm({ pro, onClose }) {
         amount: Number(pro?.pricePerSession || 3000),
         currency: pro?.currency || 'PKR',
         method: 'bank_transfer',
-        fileUrl,
+        proofDataUrl,
+        proofFileName: proofFile.name,
+        proofFileType: proofFile.type,
+        proofFileSize: proofFile.size,
         status: 'pending',
         createdAt: serverTimestamp()
       }
@@ -357,10 +377,10 @@ function CheckoutForm({ pro, onClose }) {
                         onClick={() => !slot.isBooked && setSelectedSlot(slot)}
                         disabled={slot.isBooked}
                         className={`rounded-2xl border px-3 py-3 text-sm font-bold transition-all ${slot.isBooked
-                            ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300'
-                            : isSelected
-                              ? 'border-primary bg-primary text-white shadow-float-primary'
-                              : 'border-neutral-200 bg-white text-neutral-700 hover:border-primary-light hover:bg-primary-light/5 hover:text-primary'
+                          ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300'
+                          : isSelected
+                            ? 'border-primary bg-primary text-white shadow-float-primary'
+                            : 'border-neutral-200 bg-white text-neutral-700 hover:border-primary-light hover:bg-primary-light/5 hover:text-primary'
                           }`}
                       >
                         <div>{slot.startsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
@@ -391,9 +411,9 @@ function CheckoutForm({ pro, onClose }) {
         <div className="rounded-[24px] border border-neutral-200 bg-surface p-5 text-sm text-neutral-700">
           <div className="mb-2 font-bold text-neutral-900">Our Bank Details</div>
           <div className="space-y-1">
-            <div>Habib Bank Limited (HBL)</div>
-            <div>SHARE Mental Health Pvt.</div>
-            <div>PK24 HABB 0001 2345 6789 0123</div>
+            <div>Meezan Bank (HBL)</div>
+            <div>Muhammad Khizer</div>
+            <div>PK28 MEZN 0001 1901 1037 2223</div>
           </div>
         </div>
 
@@ -407,10 +427,10 @@ function CheckoutForm({ pro, onClose }) {
               <span className="text-[14px] font-medium text-neutral-600">
                 {proofFile ? proofFile.name : "Click to select screenshot/receipt"}
               </span>
-              <input 
-                type="file" 
-                className="hidden" 
-                accept="image/*,.pdf" 
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*,.pdf"
                 onChange={(e) => setProofFile(e.target.files[0])}
               />
             </div>

@@ -69,9 +69,11 @@ export default function ProfessionalCard({ pro, index = 0 }) {
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-5 border-t border-neutral-100 mt-auto">
-          <div>
-            <p className="text-[12px] font-bold uppercase tracking-wider text-neutral-400 mb-1">Next available</p>
-            <p className={`text-[14px] font-semibold ${pro.online ? 'text-primary' : 'text-neutral-600'}`}>
+          <div className="space-y-0.5">
+            <p className="text-[15px] font-bold text-neutral-900">
+              {pro.currency || "PKR"} {Number(pro.pricePerSession || 3000).toLocaleString()} <span className="text-[12px] text-neutral-400 font-medium">/ session</span>
+            </p>
+            <p className={`text-[12px] font-semibold tracking-wide ${pro.online ? 'text-primary' : 'text-neutral-500'}`}>
               {pro.nextSlot || 'Consultation available'}
             </p>
           </div>

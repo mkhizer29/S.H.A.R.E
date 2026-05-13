@@ -41,11 +41,13 @@ export const useProStore = create((set) => ({
       const q = query(
         collection(db, 'professionals'), 
         where('approvalStatus', '==', 'approved'),
-        where('verified', '==', true),
-        orderBy('rating', 'desc')
+        where('verified', '==', true)
       )
       const snapshot = await getDocs(q)
       const pros = snapshot.docs.map(normalizeProfessional)
+      
+      // Sort client-side to avoid requiring a composite index
+      pros.sort((a, b) => (b.rating || 0) - (a.rating || 0))
 
       set({ professionals: pros, isLoading: false })
     } catch (error) {
@@ -85,7 +87,8 @@ export const useProStore = create((set) => ({
       const safeUpdates = { ...updates }
       const protectedFields = [
         'verified', 'approvalStatus', 'reviewedAt', 'reviewedBy', 
-        'rejectionReason', 'role', 'rating', 'reviewCount', 'sessionCount'
+        'rejectionReason', 'role', 'rating', 'reviewCount', 'sessionCount',
+        'specialties', 'languages', 'pricePerSession', 'currency'
       ]
       protectedFields.forEach(field => delete safeUpdates[field])
 
