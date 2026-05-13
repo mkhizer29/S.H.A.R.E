@@ -33,7 +33,19 @@ service cloud.firestore {
     }
 
     match /payment_proofs/{proofId} {
-      allow create: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.patientId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'bookingId', 'patientId', 'professionalId', 'amount', 'currency', 
+          'method', 'proofDataUrl', 'proofFileName', 'proofFileType', 
+          'proofFileSize', 'status', 'createdAt'
+        ])
+        && request.resource.data.proofDataUrl is string
+        && request.resource.data.proofFileName is string
+        && request.resource.data.proofFileType is string
+        && request.resource.data.proofFileSize is number
+        && request.resource.data.proofFileSize <= 500 * 1024
+        && request.resource.data.status == "pending";
       allow read, update: if isAdmin() || (signedIn() && (resource.data.patientId == request.auth.uid || resource.data.professionalId == request.auth.uid));
       allow delete: if false;
     }
